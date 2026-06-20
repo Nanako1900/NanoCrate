@@ -1,0 +1,34 @@
+# === Tooling state (Claude Code / oh-my-claudecode) ===
+.omc/
+.claude/settings.local.json
+
+# === Env / secrets ===
+.env
+.env.*
+!.env.example
+
+# === Go (backend) ===
+/backend/bin/
+/backend/tmp/
+*.test
+*.out
+coverage.*
+__debug_bin*
+
+# === Node (frontend) ===
+node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/coverage/
+/frontend/playwright-report/
+/frontend/test-results/
+*.local
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
