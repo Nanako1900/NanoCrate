@@ -141,6 +141,33 @@
   .label-mono {
     font-family: var(--font-mono);
   }
+
+  /* Overlay/panel entrances — transform + opacity only (compositor-friendly).
+     The global reduced-motion rule neutralizes the duration. */
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-overlay-in {
+    animation: overlay-in var(--duration-fast) var(--ease-standard);
+  }
+  .animate-panel-in {
+    animation: panel-in var(--duration-normal) var(--ease-out-expo);
+  }
 }
 
 /* Respect user motion preference globally (defense-in-depth alongside the hook). */
