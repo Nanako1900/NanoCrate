@@ -77,7 +77,7 @@ interface ApiResult<T> {
   meta: PaginationMeta | null;
 }
 
-async function request<T>(path: string, options: RequestOptions<T>): Promise<ApiResult<T>> {
+export async function request<T>(path: string, options: RequestOptions<T>): Promise<ApiResult<T>> {
   const { method = 'GET', body, schema, auth = false, idempotencyKey, headers: extraHeaders, signal } = options;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
