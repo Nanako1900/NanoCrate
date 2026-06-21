@@ -13,6 +13,7 @@ import (
 	invdb "github.com/Nanako1900/NanoCrate/backend/internal/inventory/db"
 	orderdb "github.com/Nanako1900/NanoCrate/backend/internal/order/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/payment"
+	"github.com/Nanako1900/NanoCrate/backend/internal/platform/observability"
 )
 
 // errOrderNotYetVisible means a settlement event referenced a payment intent that
@@ -122,6 +123,7 @@ func (s *Service) settlePaid(ctx context.Context, orderQ *orderdb.Queries, invQ 
 		AggregateID:   order.ID,
 		EventType:     "OrderPlaced",
 		Payload:       payload,
+		TraceParent:   observability.TraceParent(ctx),
 	}); err != nil {
 		return fmt.Errorf("write outbox: %w", err)
 	}

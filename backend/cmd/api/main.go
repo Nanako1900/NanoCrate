@@ -26,6 +26,7 @@ import (
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/logging"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/metrics"
+	"github.com/Nanako1900/NanoCrate/backend/internal/platform/observability"
 )
 
 func main() {
@@ -42,6 +43,17 @@ func main() {
 	}
 
 	rootCtx := context.Background()
+
+	shutdownTracer, err := observability.InitTracer(rootCtx, "nanocrate-api", cfg.OTLPEndpoint)
+	if err != nil {
+		logger.Error("tracer initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracer(shutdownCtx)
+	}()
 
 	pool, err := db.NewPool(rootCtx, cfg.DatabaseURL)
 	if err != nil {

@@ -11,7 +11,7 @@ export
 
 DATABASE_URL ?= postgres://nano:nano@localhost:5432/nanocrate?sslmode=disable
 
-.PHONY: help run air build migrate-up migrate-down migrate-new sqlc \
+.PHONY: help run worker air build migrate-up migrate-down migrate-new sqlc \
         test test-unit test-int cover lint vet tidy fmt compose-up compose-down
 
 help: ## 显示可用目标
@@ -23,6 +23,9 @@ help: ## 显示可用目标
 
 run: .env ## 启动 API(默认 :8080)
 	go run ./cmd/api
+
+worker: .env ## 启动事件 worker(outbox relay + consumer + sweeper)
+	go run ./cmd/worker
 
 air: .env ## 热重载启动(需 air)
 	$(GOPATH_BIN)/air

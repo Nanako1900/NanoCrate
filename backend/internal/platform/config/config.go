@@ -17,6 +17,9 @@ type Config struct {
 	StripeSecretKey     string
 	StripeWebhookSecret string
 	NATSURL             string
+	OTLPEndpoint        string   // OTEL_EXPORTER_OTLP_ENDPOINT (host:port); empty = no exporter
+	CORSAllowedOrigins  []string // credentialed CORS allowlist (docs §9.2.1)
+	SMTP                SMTP
 }
 
 // Keycloak holds the OIDC Resource Server settings (signature + iss/aud validation).
@@ -24,6 +27,15 @@ type Keycloak struct {
 	Issuer   string
 	JWKSURL  string
 	Audience string
+}
+
+// SMTP holds optional outbound-email settings. Empty Host selects the LogNotifier.
+type SMTP struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+	From     string
 }
 
 // Load reads configuration from the environment, applying defaults for optional
@@ -41,6 +53,15 @@ func Load() (Config, error) {
 		StripeSecretKey:     os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		NATSURL:             getDefault("NATS_URL", "nats://localhost:4222"),
+		OTLPEndpoint:        os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		CORSAllowedOrigins:  splitCSV(getDefault("CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
+		SMTP: SMTP{
+			Host:     os.Getenv("SMTP_HOST"),
+			Port:     getDefault("SMTP_PORT", "1025"),
+			Username: os.Getenv("SMTP_USERNAME"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			From:     getDefault("SMTP_FROM", "no-reply@nanocrate.local"),
+		},
 	}
 
 	required := []struct {
@@ -69,4 +90,16 @@ func getDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// splitCSV splits a comma-separated list, trimming spaces and dropping empties.
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }

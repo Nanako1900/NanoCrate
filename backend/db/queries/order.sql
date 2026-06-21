@@ -84,8 +84,8 @@ INSERT INTO processed_events (event_id) VALUES ($1)
 ON CONFLICT (event_id) DO NOTHING;
 
 -- name: InsertOutbox :exec
-INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload)
-VALUES ($1, $2, $3, $4);
+INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload, trace_parent)
+VALUES ($1, $2, $3, $4, $5);
 
 -- name: CountOutbox :one
 SELECT COUNT(*)::bigint FROM outbox WHERE aggregate_id = $1 AND event_type = $2;

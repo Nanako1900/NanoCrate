@@ -245,8 +245,8 @@ func (q *Queries) GetOrderForUser(ctx context.Context, arg GetOrderForUserParams
 }
 
 const insertOutbox = `-- name: InsertOutbox :exec
-INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload)
-VALUES ($1, $2, $3, $4)
+INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload, trace_parent)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertOutboxParams struct {
@@ -254,6 +254,7 @@ type InsertOutboxParams struct {
 	AggregateID   uuid.UUID       `json:"aggregate_id"`
 	EventType     string          `json:"event_type"`
 	Payload       json.RawMessage `json:"payload"`
+	TraceParent   string          `json:"trace_parent"`
 }
 
 func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
@@ -262,6 +263,7 @@ func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) erro
 		arg.AggregateID,
 		arg.EventType,
 		arg.Payload,
+		arg.TraceParent,
 	)
 	return err
 }

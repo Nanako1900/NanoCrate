@@ -37,10 +37,49 @@ services:
   nats:
     image: nats:2.10
     container_name: nanocrate-nats
-    command: ["-js", "-m", "8222"]   # JetStream + 监控端口(本阶段起起来即可,不深接)
+    command: ["-js", "-m", "8222"]   # JetStream + 监控端口
     ports:
       - "4222:4222"
       - "8222:8222"
 
+  # 可观测性栈(SPEC §9):trace → Jaeger;指标 → Prometheus + Grafana。
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: nanocrate-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC(API/worker 导出 trace 到这里)
+      - "4318:4318"     # OTLP HTTP
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: nanocrate-prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 抓取宿主机上 make run 的 API/worker
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: nanocrate-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - jaeger
+    ports:
+      - "3001:3000"   # Grafana UI(避开前端 3000)
+
 volumes:
   pgdata:
+  grafanadata:
