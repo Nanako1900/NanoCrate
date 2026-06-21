@@ -12,8 +12,15 @@ import (
 )
 
 const (
-	cartCookie       = "nano_cart"
+	// CookieName is the guest cart cookie. Exported so the checkout flow can read
+	// the same cookie to authorize guest-cart checkout (B4).
+	CookieName       = "nano_cart"
 	cartCookieMaxAge = 60 * 60 * 24 * 30 // 30 days
+
+	// MaxLineQty bounds a single cart line's quantity. It guards against int32
+	// overflow from repeated accumulating adds (B9) and against a single line
+	// locking an entire SKU at checkout (B7).
+	MaxLineQty = 999
 )
 
 // Handler exposes the session-scoped cart endpoints (contract §9.4).
@@ -130,7 +137,7 @@ func (h *Handler) resolve(c *gin.Context) (uuid.UUID, bool) {
 	}
 	if setCookie != uuid.Nil {
 		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie(cartCookie, setCookie.String(), cartCookieMaxAge, "/", "", h.secureCookies, true)
+		c.SetCookie(CookieName, setCookie.String(), cartCookieMaxAge, "/", "", h.secureCookies, true)
 	}
 	return cartID, true
 }
@@ -141,7 +148,7 @@ func (h *Handler) sessionFrom(c *gin.Context) Session {
 		sub := p.Subject
 		sess.UserID = &sub
 	}
-	if v, err := c.Cookie(cartCookie); err == nil {
+	if v, err := c.Cookie(CookieName); err == nil {
 		if id, err := uuid.Parse(v); err == nil {
 			sess.CookieCartID = &id
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	cartdb "github.com/Nanako1900/NanoCrate/backend/internal/cart/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/inventory"
 	invdb "github.com/Nanako1900/NanoCrate/backend/internal/inventory/db"
@@ -34,27 +35,46 @@ func (noopMetrics) IncOrdersPaid() {}
 
 // Service runs the checkout saga and settles Stripe webhooks.
 type Service struct {
-	pool     *pgxpool.Pool
-	inv      *inventory.Service
-	provider payment.Provider
-	cartQ    *cartdb.Queries
-	orderQ   *orderdb.Queries
-	metrics  Metrics
+	pool       *pgxpool.Pool
+	inv        *inventory.Service
+	provider   payment.Provider
+	cartQ      *cartdb.Queries
+	orderQ     *orderdb.Queries
+	metrics    Metrics
+	maxLineQty int32
+}
+
+// Option customizes the checkout service.
+type Option func(*Service)
+
+// WithMaxLineQty overrides the per-line quantity cap enforced at checkout (B7).
+// Values <= 0 are ignored.
+func WithMaxLineQty(n int32) Option {
+	return func(s *Service) {
+		if n > 0 {
+			s.maxLineQty = n
+		}
+	}
 }
 
 // NewService wires the checkout service. A nil metrics is treated as no-op.
-func NewService(pool *pgxpool.Pool, inv *inventory.Service, provider payment.Provider, metrics Metrics) *Service {
+func NewService(pool *pgxpool.Pool, inv *inventory.Service, provider payment.Provider, metrics Metrics, opts ...Option) *Service {
 	if metrics == nil {
 		metrics = noopMetrics{}
 	}
-	return &Service{
-		pool:     pool,
-		inv:      inv,
-		provider: provider,
-		cartQ:    cartdb.New(pool),
-		orderQ:   orderdb.New(pool),
-		metrics:  metrics,
+	s := &Service{
+		pool:       pool,
+		inv:        inv,
+		provider:   provider,
+		cartQ:      cartdb.New(pool),
+		orderQ:     orderdb.New(pool),
+		metrics:    metrics,
+		maxLineQty: cart.MaxLineQty,
 	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // Result is the checkout response (contract §9.3).
@@ -65,7 +85,13 @@ type Result struct {
 
 // Checkout reserves stock for every cart line and creates a pending order in one
 // transaction, then creates a payment intent. Idempotent on the Idempotency-Key.
-func (s *Service) Checkout(ctx context.Context, userID string, cartID uuid.UUID, idempotencyKey string) (Result, error) {
+//
+// cookieCartID is the guest cart id carried in the caller's cart cookie (nil if
+// none). It authorizes checking out an unowned (guest) cart: an authenticated
+// user may check out their own cart, or a guest cart only if they present its
+// cookie. This blocks the cross-session IDOR of checking out an arbitrary guest
+// cart by id (B4).
+func (s *Service) Checkout(ctx context.Context, userID string, cartID uuid.UUID, cookieCartID *uuid.UUID, idempotencyKey string) (Result, error) {
 	idemParams := orderdb.GetOrderByIdempotencyKeyParams{UserID: userID, IdempotencyKey: idempotencyKey}
 	if existing, err := s.orderQ.GetOrderByIdempotencyKey(ctx, idemParams); err == nil {
 		return s.replay(ctx, existing)
@@ -80,9 +106,19 @@ func (s *Service) Checkout(ctx context.Context, userID string, cartID uuid.UUID,
 		}
 		return Result{}, fmt.Errorf("load cart: %w", err)
 	}
-	// A user may only check out their own cart or a guest cart (user_id NULL).
-	if cartRow.UserID != nil && *cartRow.UserID != userID {
+	// Authorize: the cart must be the user's own, or a guest (NULL-owner) cart
+	// whose cookie the caller presents. A NULL-owner cart is never accepted on id
+	// alone (B4).
+	owned := cartRow.UserID != nil && *cartRow.UserID == userID
+	guestMatch := cartRow.UserID == nil && cookieCartID != nil && *cookieCartID == cartID
+	if !owned && !guestMatch {
 		return Result{}, ErrCartNotFound
+	}
+	// Only an active cart can be checked out. A converted/abandoned cart means a
+	// prior checkout already consumed it; reusing it (e.g. with a different
+	// Idempotency-Key) would double-reserve stock and create a duplicate order (B2).
+	if cartRow.Status != "active" {
+		return Result{}, ErrCartNotActive
 	}
 	lines, err := s.cartQ.ListCartItemsDetailed(ctx, cartID)
 	if err != nil {
@@ -90,6 +126,12 @@ func (s *Service) Checkout(ctx context.Context, userID string, cartID uuid.UUID,
 	}
 	if len(lines) == 0 {
 		return Result{}, ErrEmptyCart
+	}
+	// Per-line quantity cap: a single line must not lock an entire SKU (B7).
+	for _, l := range lines {
+		if l.Qty > s.maxLineQty {
+			return Result{}, ErrLineQtyTooLarge
+		}
 	}
 
 	subtotal := int64(0)
@@ -141,8 +183,17 @@ func (s *Service) reserveAndCreateOrder(ctx context.Context, userID string, cart
 	if err := s.reserveLines(ctx, invQ, orderQ, order.ID, lines); err != nil {
 		return orderdb.Order{}, err
 	}
-	if err := cartQ.MarkCartConverted(ctx, cartID); err != nil {
+	// Atomic claim+convert is the saga's commit point. It asserts the cart is
+	// still 'active' (and owned-or-guest), claims it to the user, and flips it to
+	// 'converted' in one statement. RowsAffected==0 means a concurrent or prior
+	// checkout already consumed the cart — roll back so this attempt cannot
+	// double-reserve or create a duplicate order (B2/B4).
+	rows, err := cartQ.ClaimAndConvertCart(ctx, cartdb.ClaimAndConvertCartParams{ID: cartID, UserID: userID})
+	if err != nil {
 		return orderdb.Order{}, fmt.Errorf("convert cart: %w", err)
+	}
+	if rows != 1 {
+		return orderdb.Order{}, ErrCartNotActive
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return orderdb.Order{}, fmt.Errorf("commit checkout: %w", err)

@@ -15,8 +15,15 @@ FROM carts WHERE user_id = $1 AND status = 'active';
 -- name: TouchCart :exec
 UPDATE carts SET updated_at = now() WHERE id = $1;
 
--- name: MarkCartConverted :exec
-UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1;
+-- name: ClaimAndConvertCart :execrows
+-- 结账的提交点(原子):仅当车仍 active 且属于本人或为游客车(NULL owner)时,
+-- 同一语句内 claim 给用户并置 converted。返回受影响行数,调用方断言 ==1:
+-- ==0 表示车已被并发/先前结账转换或不归本人 → 整个结账事务回滚(防重复结账/IDOR)。
+UPDATE carts
+SET user_id = sqlc.arg(user_id)::text, status = 'converted', updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND status = 'active'
+  AND (user_id IS NULL OR user_id = sqlc.arg(user_id)::text);
 
 -- name: UpsertCartItem :one
 -- 加项:同 variant 已存在则累加数量。

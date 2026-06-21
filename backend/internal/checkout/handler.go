@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
+	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	"github.com/Nanako1900/NanoCrate/backend/internal/payment"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/web"
 )
@@ -63,12 +64,28 @@ func (h *Handler) checkout(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.Checkout(c.Request.Context(), principal.Subject, cartID, idempotencyKey)
+	// The guest cart cookie (if any) authorizes checking out an unowned cart (B4).
+	cookieCartID := guestCartFromCookie(c)
+
+	result, err := h.svc.Checkout(c.Request.Context(), principal.Subject, cartID, cookieCartID, idempotencyKey)
 	if err != nil {
 		h.checkoutError(c, err)
 		return
 	}
 	web.OK(c, gin.H{"order_id": result.OrderID, "client_secret": result.ClientSecret})
+}
+
+// guestCartFromCookie parses the guest cart cookie into a cart id, or nil.
+func guestCartFromCookie(c *gin.Context) *uuid.UUID {
+	v, err := c.Cookie(cart.CookieName)
+	if err != nil {
+		return nil
+	}
+	id, err := uuid.Parse(v)
+	if err != nil {
+		return nil
+	}
+	return &id
 }
 
 func (h *Handler) checkoutError(c *gin.Context, err error) {
@@ -78,6 +95,10 @@ func (h *Handler) checkoutError(c *gin.Context, err error) {
 		web.Fail(c, http.StatusConflict, web.CodeOutOfStock, oos.Error())
 	case errors.Is(err, ErrEmptyCart):
 		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "cart is empty")
+	case errors.Is(err, ErrLineQtyTooLarge):
+		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "cart line quantity exceeds maximum")
+	case errors.Is(err, ErrCartNotActive):
+		web.Fail(c, http.StatusConflict, web.CodeConflict, "cart is no longer active")
 	case errors.Is(err, ErrCartNotFound):
 		web.Fail(c, http.StatusNotFound, web.CodeNotFound, "cart not found")
 	default:

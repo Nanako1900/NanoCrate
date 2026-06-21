@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -45,7 +46,7 @@ func TestIntegration_Checkout_FullChainAndWebhookIdempotency(t *testing.T) {
 	svc := checkout.NewService(pool, inv, provider, nil)
 
 	// 1. Checkout reserves stock and creates a pending order.
-	res, err := svc.Checkout(ctx, "user-1", cartID, "idem-1")
+	res, err := svc.Checkout(ctx, "user-1", cartID, nil, "idem-1")
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
@@ -55,7 +56,7 @@ func TestIntegration_Checkout_FullChainAndWebhookIdempotency(t *testing.T) {
 	assertInventory(t, inv, variantID, 8, 2)
 
 	// 2. Idempotent replay returns the same order without reserving again.
-	res2, err := svc.Checkout(ctx, "user-1", cartID, "idem-1")
+	res2, err := svc.Checkout(ctx, "user-1", cartID, nil, "idem-1")
 	if err != nil {
 		t.Fatalf("checkout replay: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestIntegration_Checkout_OutOfStockRollsBack(t *testing.T) {
 	inv := inventory.NewService(pool, nil)
 	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil)
 
-	_, err := svc.Checkout(ctx, "user-2", cartID, "idem-oos")
+	_, err := svc.Checkout(ctx, "user-2", cartID, nil, "idem-oos")
 	var oos *checkout.OutOfStockError
 	if !errors.As(err, &oos) {
 		t.Fatalf("err = %v, want OutOfStockError", err)
@@ -125,7 +126,7 @@ func TestIntegration_Webhook_PaymentFailedReleasesStock(t *testing.T) {
 	provider := payment.NewFakeProvider("whsec_test")
 	svc := checkout.NewService(pool, inv, provider, nil)
 
-	res, err := svc.Checkout(ctx, "user-3", cartID, "idem-3")
+	res, err := svc.Checkout(ctx, "user-3", cartID, nil, "idem-3")
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
@@ -150,11 +151,11 @@ func TestIntegration_Checkout_IdempotencyScopedPerUser(t *testing.T) {
 	cartB := seedCart(t, pool, "user-b", variantID, 1)
 	svc := checkout.NewService(pool, inventory.NewService(pool, nil), payment.NewFakeProvider("whsec_test"), nil)
 
-	rA, err := svc.Checkout(ctx, "user-a", cartA, "shared-key")
+	rA, err := svc.Checkout(ctx, "user-a", cartA, nil, "shared-key")
 	if err != nil {
 		t.Fatalf("checkout A: %v", err)
 	}
-	rB, err := svc.Checkout(ctx, "user-b", cartB, "shared-key")
+	rB, err := svc.Checkout(ctx, "user-b", cartB, nil, "shared-key")
 	if err != nil {
 		t.Fatalf("checkout B: %v", err)
 	}
@@ -170,10 +171,170 @@ func TestIntegration_Checkout_RejectsAnotherUsersCart(t *testing.T) {
 	cartID := seedCart(t, pool, "owner", variantID, 1)
 	svc := checkout.NewService(pool, inventory.NewService(pool, nil), payment.NewFakeProvider("whsec_test"), nil)
 
-	_, err := svc.Checkout(ctx, "attacker", cartID, "k")
+	_, err := svc.Checkout(ctx, "attacker", cartID, nil, "k")
 	if !errors.Is(err, checkout.ErrCartNotFound) {
 		t.Errorf("err = %v, want ErrCartNotFound (IDOR blocked)", err)
 	}
+}
+
+func seedGuestCart(t *testing.T, pool *pgxpool.Pool, variantID uuid.UUID, qty int32) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	q := cartdb.New(pool)
+	c, err := q.CreateCart(ctx, cartdb.CreateCartParams{Currency: "USD"}) // UserID nil => guest cart
+	if err != nil {
+		t.Fatalf("create guest cart: %v", err)
+	}
+	if _, err := q.UpsertCartItem(ctx, cartdb.UpsertCartItemParams{CartID: c.ID, VariantID: variantID, Qty: qty}); err != nil {
+		t.Fatalf("add cart item: %v", err)
+	}
+	return c.ID
+}
+
+// B2: once a cart is converted by a checkout, re-checking it out with a DIFFERENT
+// Idempotency-Key (which bypasses the per-key idempotency replay) must be rejected
+// — otherwise it double-reserves stock and creates a duplicate order.
+func TestIntegration_Checkout_ConvertedCartRejectedForDifferentKey(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 10)
+	cartID := seedCart(t, pool, "user-dbl", variantID, 2)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil)
+
+	if _, err := svc.Checkout(ctx, "user-dbl", cartID, nil, "key-1"); err != nil {
+		t.Fatalf("first checkout: %v", err)
+	}
+	assertInventory(t, inv, variantID, 8, 2)
+
+	_, err := svc.Checkout(ctx, "user-dbl", cartID, nil, "key-2")
+	if !errors.Is(err, checkout.ErrCartNotActive) {
+		t.Fatalf("second checkout err = %v, want ErrCartNotActive", err)
+	}
+	assertInventory(t, inv, variantID, 8, 2) // unchanged: no double reservation
+
+	orders, err := orderdb.New(pool).ListOrdersByUser(ctx, orderdb.ListOrdersByUserParams{UserID: "user-dbl", Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("list orders: %v", err)
+	}
+	if len(orders) != 1 {
+		t.Errorf("orders for user = %d, want 1 (no duplicate order)", len(orders))
+	}
+}
+
+// B4: an authenticated user must not be able to check out an arbitrary guest
+// (NULL-owner) cart by id. Only the cart's owner, or a guest who presents the
+// cart's cookie, may check it out.
+func TestIntegration_Checkout_RejectsGuestCartWithoutMatchingCookie(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 10)
+	guestCart := seedGuestCart(t, pool, variantID, 1)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil)
+
+	// No cookie at all.
+	if _, err := svc.Checkout(ctx, "attacker", guestCart, nil, "k1"); !errors.Is(err, checkout.ErrCartNotFound) {
+		t.Fatalf("no-cookie err = %v, want ErrCartNotFound (guest IDOR blocked)", err)
+	}
+	// A non-matching cookie.
+	other := uuid.New()
+	if _, err := svc.Checkout(ctx, "attacker", guestCart, &other, "k2"); !errors.Is(err, checkout.ErrCartNotFound) {
+		t.Fatalf("wrong-cookie err = %v, want ErrCartNotFound", err)
+	}
+	assertInventory(t, inv, variantID, 10, 0) // nothing reserved by the blocked attempts
+}
+
+// B4 (happy path): presenting the matching guest cookie authorizes checkout and
+// claims the cart to the buyer.
+func TestIntegration_Checkout_GuestCartWithMatchingCookieClaimsAndConverts(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 10)
+	guestCart := seedGuestCart(t, pool, variantID, 2)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil)
+
+	res, err := svc.Checkout(ctx, "buyer", guestCart, &guestCart, "k")
+	if err != nil {
+		t.Fatalf("guest checkout with cookie: %v", err)
+	}
+	if res.OrderID == "" {
+		t.Fatal("no order id returned")
+	}
+	assertInventory(t, inv, variantID, 8, 2)
+
+	c, err := cartdb.New(pool).GetCart(ctx, guestCart)
+	if err != nil {
+		t.Fatalf("get cart: %v", err)
+	}
+	if c.UserID == nil || *c.UserID != "buyer" {
+		t.Errorf("cart user_id = %v, want \"buyer\" (claimed at checkout)", c.UserID)
+	}
+	if c.Status != "converted" {
+		t.Errorf("cart status = %q, want converted", c.Status)
+	}
+}
+
+// B7: a single cart line must not exceed the per-line quantity cap at checkout
+// (else one line can lock an entire SKU). The cap is configurable.
+func TestIntegration_Checkout_PerLineQtyCapEnforced(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 100)
+	cartID := seedCart(t, pool, "user-cap", variantID, 2)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil, checkout.WithMaxLineQty(1))
+
+	_, err := svc.Checkout(ctx, "user-cap", cartID, nil, "k")
+	if !errors.Is(err, checkout.ErrLineQtyTooLarge) {
+		t.Fatalf("err = %v, want ErrLineQtyTooLarge", err)
+	}
+	assertInventory(t, inv, variantID, 100, 0) // nothing reserved
+}
+
+// B2 (concurrency): many checkouts of the same active cart with DIFFERENT
+// Idempotency-Keys race; exactly one must win and reserve stock once, the rest
+// must be rejected with ErrCartNotActive and reserve nothing.
+func TestIntegration_Checkout_ConcurrentDifferentKeysReserveOnce(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 100)
+	cartID := seedCart(t, pool, "user-conc", variantID, 5)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, payment.NewFakeProvider("whsec_test"), nil)
+
+	const n = 8
+	results := make([]error, n)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, err := svc.Checkout(ctx, "user-conc", cartID, nil, fmt.Sprintf("key-%d", i))
+			results[i] = err
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	success := 0
+	for _, err := range results {
+		switch {
+		case err == nil:
+			success++
+		case errors.Is(err, checkout.ErrCartNotActive):
+			// expected loser
+		default:
+			t.Errorf("unexpected checkout error: %v", err)
+		}
+	}
+	if success != 1 {
+		t.Errorf("successful checkouts = %d, want exactly 1", success)
+	}
+	assertInventory(t, inv, variantID, 95, 5) // reserved exactly once
 }
 
 func assertInventory(t *testing.T, inv *inventory.Service, variantID uuid.UUID, wantAvail, wantReserved int32) {
