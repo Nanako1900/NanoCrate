@@ -55,6 +55,33 @@ describe('optimisticAdd', () => {
     expect(next.items).toHaveLength(1);
     expect(next.item_count).toBe(1);
   });
+
+  it('does not mask out-of-stock as qty 1 (F5)', () => {
+    // available: 0 → clamp to 0, never floor to 1; the server cart is the truth.
+    const next = optimisticAdd(
+      undefined,
+      { variant_id: 'v0', sku: 'S', name: 'N', unit_price_cents: 100, available: 0 },
+      2,
+    );
+    expect(next.items[0].qty).toBe(0);
+    expect(next.items[0].line_total_cents).toBe(0);
+    expect(next.subtotal_cents).toBe(0);
+  });
+
+  it('merges a repeat add by variant_id even if the server id differs (F14)', () => {
+    const serverCart: Cart = {
+      ...base,
+      items: [{ ...base.items[0], id: 'srv_opaque_999' }], // backend's opaque id
+    };
+    const next = optimisticAdd(
+      serverCart,
+      { variant_id: 'v1', sku: 'SKU1', name: 'A', unit_price_cents: 1000, available: 5 },
+      2,
+    );
+    expect(next.items).toHaveLength(1); // merged, not duplicated
+    expect(next.items[0].qty).toBe(3);
+    expect(next.items[0].id).toBe('srv_opaque_999'); // preserves the server id
+  });
 });
 
 describe('optimisticUpdate', () => {
