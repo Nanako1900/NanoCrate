@@ -83,8 +83,10 @@ export function CatalogFilters({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft" aria-live="polite">
-        <span>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft">
+        {/* Only the count is a live region — keep the clear-search button out of
+            it so toggling the search doesn't re-announce the whole button. */}
+        <span role="status">
           <span className="font-mono tabular-nums text-ink">{total}</span> {pluralize(total, 'result')}
         </span>
         {query && (

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
+import { CartDrawer } from '@/components/cart/CartDrawer';
 
 interface AppShellProps {
   children: ReactNode;
@@ -20,6 +21,7 @@ export function AppShell({ children }: AppShellProps) {
         {children}
       </main>
       <SiteFooter />
+      <CartDrawer />
     </div>
   );
 }
