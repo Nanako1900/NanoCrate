@@ -280,6 +280,44 @@ func (q *Queries) InsertProcessedEvent(ctx context.Context, eventID string) (int
 	return result.RowsAffected(), nil
 }
 
+const listAbandonedPendingOrders = `-- name: ListAbandonedPendingOrders :many
+SELECT id FROM orders
+WHERE status = 'pending'
+  AND stripe_payment_intent_id IS NULL
+  AND created_at < $1
+ORDER BY created_at
+LIMIT $2
+`
+
+type ListAbandonedPendingOrdersParams struct {
+	OlderThan time.Time `json:"older_than"`
+	MaxRows   int32     `json:"max_rows"`
+}
+
+// B6: orders stuck 'pending' that never received a payment intent (intent
+// creation failed after the order committed) and are older than the cutoff. With
+// no PI no payment can ever succeed, so a sweeper can safely cancel them and
+// release any stock still held — no late-payment race.
+func (q *Queries) ListAbandonedPendingOrders(ctx context.Context, arg ListAbandonedPendingOrdersParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAbandonedPendingOrders, arg.OlderThan, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrderItems = `-- name: ListOrderItems :many
 SELECT id, order_id, variant_id, sku, name, unit_price_cents, qty, line_total_cents, created_at
 FROM order_items WHERE order_id = $1 ORDER BY created_at

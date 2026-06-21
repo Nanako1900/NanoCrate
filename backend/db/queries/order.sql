@@ -58,6 +58,18 @@ LIMIT $2 OFFSET $3;
 -- name: CountOrdersByUser :one
 SELECT COUNT(*)::bigint FROM orders WHERE user_id = $1;
 
+-- name: ListAbandonedPendingOrders :many
+-- B6: orders stuck 'pending' that never received a payment intent (intent
+-- creation failed after the order committed) and are older than the cutoff. With
+-- no PI no payment can ever succeed, so a sweeper can safely cancel them and
+-- release any stock still held — no late-payment race.
+SELECT id FROM orders
+WHERE status = 'pending'
+  AND stripe_payment_intent_id IS NULL
+  AND created_at < sqlc.arg(older_than)
+ORDER BY created_at
+LIMIT sqlc.arg(max_rows);
+
 -- name: CreateOrderItem :exec
 INSERT INTO order_items (order_id, variant_id, sku, name, unit_price_cents, qty, line_total_cents)
 VALUES ($1, $2, $3, $4, $5, $6, $7);

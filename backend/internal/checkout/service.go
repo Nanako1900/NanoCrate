@@ -24,6 +24,10 @@ const reservationTTL = 15 * time.Minute
 
 var errDuplicateOrder = errors.New("duplicate order for idempotency key")
 
+// errOrderNotCancelled means a sweep lost the race to settle/cancel an order that
+// was no longer pending. The sweeper skips it.
+var errOrderNotCancelled = errors.New("order no longer pending")
+
 // Metrics receives checkout business signals (orders paid).
 type Metrics interface {
 	IncOrdersPaid()
@@ -249,6 +253,61 @@ func (s *Service) attachPaymentIntent(ctx context.Context, order orderdb.Order, 
 		return Result{}, fmt.Errorf("save payment intent: %w", err)
 	}
 	return Result{OrderID: order.ID.String(), ClientSecret: intent.ClientSecret}, nil
+}
+
+// SweepAbandonedPendingOrders cancels orders left 'pending' that never received a
+// payment intent (e.g. intent creation failed after the order committed) and are
+// older than olderThan, releasing any stock they still hold. Because such orders
+// have no payment intent, no payment can ever succeed, so cancelling is safe (no
+// late-payment race). This is the order side of the Phase-3 expiry sweeper (it
+// pairs with inventory.ReleaseExpired); the logic and its test live here now.
+// Returns the number of orders cancelled.
+func (s *Service) SweepAbandonedPendingOrders(ctx context.Context, olderThan time.Time, limit int32) (int, error) {
+	ids, err := s.orderQ.ListAbandonedPendingOrders(ctx, orderdb.ListAbandonedPendingOrdersParams{
+		OlderThan: olderThan,
+		MaxRows:   limit,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("list abandoned pending orders: %w", err)
+	}
+	cancelled := 0
+	for _, id := range ids {
+		switch err := s.cancelAbandoned(ctx, id); {
+		case err == nil:
+			cancelled++
+		case errors.Is(err, errOrderNotCancelled):
+			continue // raced with a concurrent settlement; leave it.
+		default:
+			return cancelled, err
+		}
+	}
+	return cancelled, nil
+}
+
+// cancelAbandoned releases any reservations the order still holds and flips it
+// from pending to cancelled, all in one transaction. MarkOrderFailed only touches
+// pending rows, so a concurrent settlement (pending -> paid) wins the race.
+func (s *Service) cancelAbandoned(ctx context.Context, orderID uuid.UUID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin sweep tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	orderQ := orderdb.New(tx)
+	invQ := invdb.New(tx)
+
+	if err := s.transitionReservations(ctx, invQ, orderID, false); err != nil {
+		return err
+	}
+	rows, err := orderQ.MarkOrderFailed(ctx, orderdb.MarkOrderFailedParams{ID: orderID, Status: "cancelled"})
+	if err != nil {
+		return fmt.Errorf("cancel abandoned order: %w", err)
+	}
+	if rows != 1 {
+		return errOrderNotCancelled
+	}
+	return tx.Commit(ctx)
 }
 
 // replay returns an existing order's result for an idempotent retry, re-attaching

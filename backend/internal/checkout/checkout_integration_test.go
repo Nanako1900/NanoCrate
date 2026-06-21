@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -174,6 +175,61 @@ func TestIntegration_Checkout_RejectsAnotherUsersCart(t *testing.T) {
 	_, err := svc.Checkout(ctx, "attacker", cartID, nil, "k")
 	if !errors.Is(err, checkout.ErrCartNotFound) {
 		t.Errorf("err = %v, want ErrCartNotFound (IDOR blocked)", err)
+	}
+}
+
+// failingPaymentProvider commits the order but fails to create a payment intent,
+// reproducing the B6 condition: an order stuck 'pending' with no PI.
+type failingPaymentProvider struct{}
+
+func (failingPaymentProvider) CreatePaymentIntent(context.Context, payment.CreateIntentInput) (payment.Intent, error) {
+	return payment.Intent{}, errors.New("payment gateway unavailable")
+}
+
+func (failingPaymentProvider) VerifyWebhook([]byte, string) (payment.Event, error) {
+	return payment.Event{}, payment.ErrInvalidSignature
+}
+
+// B6: if payment-intent creation fails after the order + reservation commit, the
+// order is left 'pending' with no PI and stock held. Since no payment can ever
+// arrive (no PI), the sweeper must cancel it and release the stock.
+func TestIntegration_Checkout_SweepCancelsAbandonedPendingOrders(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	variantID := testutil.SeedVariant(t, pool, 10)
+	cartID := seedCart(t, pool, "user-stuck", variantID, 3)
+	inv := inventory.NewService(pool, nil)
+	svc := checkout.NewService(pool, inv, failingPaymentProvider{}, nil)
+
+	if _, err := svc.Checkout(ctx, "user-stuck", cartID, nil, "stuck-k"); err == nil {
+		t.Fatal("expected checkout to fail when payment intent creation fails")
+	}
+	assertInventory(t, inv, variantID, 7, 3) // committed order holds stock, but is stuck pending
+
+	orderQ := orderdb.New(pool)
+	orders, err := orderQ.ListOrdersByUser(ctx, orderdb.ListOrdersByUserParams{UserID: "user-stuck", Limit: 10, Offset: 0})
+	if err != nil || len(orders) != 1 {
+		t.Fatalf("orders = %v (err %v), want exactly 1 pending order", orders, err)
+	}
+	orderID := orders[0].ID
+
+	// Sweep with a cutoff after the order's creation cancels it and frees stock.
+	n, err := svc.SweepAbandonedPendingOrders(ctx, time.Now().Add(time.Hour), 100)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("swept %d orders, want 1", n)
+	}
+	o, _ := orderQ.GetOrder(ctx, orderID)
+	if o.Status != "cancelled" {
+		t.Errorf("order status = %s, want cancelled", o.Status)
+	}
+	assertInventory(t, inv, variantID, 10, 0) // reservation released
+
+	// Idempotent: a second sweep finds nothing.
+	if n, _ := svc.SweepAbandonedPendingOrders(ctx, time.Now().Add(time.Hour), 100); n != 0 {
+		t.Errorf("second sweep cancelled %d, want 0", n)
 	}
 }
 
