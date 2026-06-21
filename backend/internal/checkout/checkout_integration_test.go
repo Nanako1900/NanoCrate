@@ -115,6 +115,11 @@ func TestIntegration_Checkout_OutOfStockRollsBack(t *testing.T) {
 	if _, err := orderdb.New(pool).GetOrderByIdempotencyKey(ctx, orderdb.GetOrderByIdempotencyKeyParams{UserID: "user-2", IdempotencyKey: "idem-oos"}); err == nil {
 		t.Errorf("an order was persisted despite out-of-stock rollback")
 	}
+	// The cart is left active (conversion only happens at the saga's commit point,
+	// after reservation), so the user can retry checkout.
+	if c, err := cartdb.New(pool).GetCart(ctx, cartID); err != nil || c.Status != "active" {
+		t.Errorf("cart status after rollback = %q (err %v), want active", c.Status, err)
+	}
 }
 
 func TestIntegration_Webhook_PaymentFailedReleasesStock(t *testing.T) {
@@ -212,6 +217,15 @@ func TestIntegration_Checkout_SweepCancelsAbandonedPendingOrders(t *testing.T) {
 		t.Fatalf("orders = %v (err %v), want exactly 1 pending order", orders, err)
 	}
 	orderID := orders[0].ID
+
+	// Age-gating: a cutoff in the PAST must not sweep a freshly-created order
+	// (proves older_than is actually honored, not ignored — the order is too young).
+	if got, err := svc.SweepAbandonedPendingOrders(ctx, time.Now().Add(-time.Hour), 100); err != nil || got != 0 {
+		t.Fatalf("past-cutoff sweep = %d (err %v), want 0 (recent order is younger than the cutoff)", got, err)
+	}
+	if o, _ := orderQ.GetOrder(ctx, orderID); o.Status != "pending" {
+		t.Fatalf("order status after past-cutoff sweep = %s, want pending (must not be swept)", o.Status)
+	}
 
 	// Sweep with a cutoff after the order's creation cancels it and frees stock.
 	n, err := svc.SweepAbandonedPendingOrders(ctx, time.Now().Add(time.Hour), 100)

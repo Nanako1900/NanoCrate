@@ -162,6 +162,61 @@ func TestIntegration_HTTP_WebhookBadSignatureAndOrderNotFound(t *testing.T) {
 	}
 }
 
+// TestIntegration_HTTP_GuestCartCheckoutRequiresCookie proves the B4 guest-cart
+// IDOR fix end-to-end through the real router/middleware: a logged-in user can
+// only check out a guest cart if they present its nano_cart cookie.
+func TestIntegration_HTTP_GuestCartCheckoutRequiresCookie(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	fixture := testutil.NewAuthFixture(t)
+	provider := payment.NewFakeProvider("whsec_test")
+	variantID := testutil.SeedVariant(t, pool, 5)
+	router := buildAPIRouter(pool, fixture.Verifier, provider)
+	token := fixture.Token(t, "user-guest-http", "customer")
+
+	// Guest (no token) creates a cart; the guest cookie value is the cart id.
+	code, body := doJSON(t, router, http.MethodPost, "/api/v1/cart/items", "",
+		map[string]any{"variant_id": variantID.String(), "qty": 1}, nil)
+	if code != http.StatusOK {
+		t.Fatalf("guest add to cart = %d (%v)", code, body)
+	}
+	guestCartID := body["data"].(map[string]any)["id"].(string)
+
+	// A logged-in user posting that guest cart_id WITHOUT the cookie is blocked
+	// (404 not_found — no IDOR, no existence leak).
+	code, body = doJSON(t, router, http.MethodPost, "/api/v1/checkout", token,
+		map[string]any{"cart_id": guestCartID}, map[string]string{"Idempotency-Key": "no-cookie"})
+	if code != http.StatusNotFound || body["error"].(map[string]any)["code"].(string) != "not_found" {
+		t.Fatalf("guest checkout without cookie = %d (%v), want 404 not_found", code, body)
+	}
+
+	// Presenting the matching guest cookie authorizes the checkout (200).
+	code, body = doJSON(t, router, http.MethodPost, "/api/v1/checkout", token,
+		map[string]any{"cart_id": guestCartID},
+		map[string]string{"Idempotency-Key": "with-cookie", "Cookie": cart.CookieName + "=" + guestCartID})
+	if code != http.StatusOK {
+		t.Fatalf("guest checkout with cookie = %d (%v), want 200", code, body)
+	}
+	if body["data"].(map[string]any)["order_id"].(string) == "" {
+		t.Errorf("checkout returned no order id: %v", body)
+	}
+}
+
+// TestIntegration_HTTP_WebhookEarlyArrivalIsRetryable proves the B1 fix at the
+// HTTP boundary: a settlement webhook for a payment intent no order carries yet
+// must return a retryable 503 (not a 200 ack that would drop the settlement).
+func TestIntegration_HTTP_WebhookEarlyArrivalIsRetryable(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	fixture := testutil.NewAuthFixture(t)
+	provider := payment.NewFakeProvider("whsec_test")
+	router := buildAPIRouter(pool, fixture.Verifier, provider)
+
+	payload := []byte(`{"id":"evt_early_http","type":"payment_succeeded","payment_intent":"pi_no_order_yet"}`)
+	code, _ := doRaw(t, router, "/api/v1/webhooks/stripe", payload, map[string]string{"Stripe-Signature": provider.Sign(payload)})
+	if code != http.StatusServiceUnavailable {
+		t.Fatalf("early webhook = %d, want 503 (retryable)", code)
+	}
+}
+
 // doJSON sends a JSON request (optional bearer token + extra headers) and decodes
 // the envelope.
 func doJSON(t *testing.T, r *gin.Engine, method, path, token string, body any, headers map[string]string) (int, map[string]any) {
