@@ -75,7 +75,7 @@ function AccountMenu() {
         className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong [&::-webkit-details-marker]:hidden"
         aria-label="账户菜单"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft font-mono text-2xs font-semibold text-accent-ink">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft font-mono text-2xs font-semibold text-accent-soft-ink">
           {(user?.name ?? 'A').slice(0, 1)}
         </span>
         <span className="hidden max-w-[10rem] truncate sm:inline">{user?.name}</span>
@@ -138,7 +138,7 @@ export function AdminTopBar({ onOpenNav, onOpenCommand }: AdminTopBarProps) {
 
       <div className="ml-auto flex items-center gap-2">
         <EnvBadge />
-        <ThemeToggle />
+        <ThemeToggle labels={{ light: '切换到浅色主题', dark: '切换到深色主题' }} />
         <AccountMenu />
       </div>
     </header>

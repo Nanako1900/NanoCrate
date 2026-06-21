@@ -6,19 +6,27 @@ const baseBtn =
   'transition-[transform,background-color,border-color,color] duration-150 ease-out ' +
   'hover:border-line-strong hover:text-ink active:translate-y-px';
 
+interface ThemeToggleProps {
+  className?: string;
+  /** Localized labels for the theme you'd switch *to* (storefront defaults to
+   *  English; the zh-CN admin passes Chinese). */
+  labels?: { light: string; dark: string };
+}
+
 /** Single-tap light/dark switch. Persists an explicit preference; the icon
  *  shows the theme you'd switch *to*, which is the affordance users expect. */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({ className, labels }: ThemeToggleProps) {
   const { theme, toggle } = useTheme();
   const next = theme === 'dark' ? 'light' : 'dark';
+  const label = (labels ?? { light: 'Switch to light theme', dark: 'Switch to dark theme' })[next];
 
   return (
     <button
       type="button"
       onClick={toggle}
       className={cn(baseBtn, className)}
-      aria-label={`Switch to ${next} theme`}
-      title={`Switch to ${next} theme`}
+      aria-label={label}
+      title={label}
     >
       {theme === 'dark' ? (
         // Sun — currently dark, tap for light.

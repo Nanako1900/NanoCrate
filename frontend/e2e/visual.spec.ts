@@ -51,7 +51,7 @@ test('admin console — both themes @visual', async ({ page }) => {
   await expect(page).toHaveScreenshot('admin-dashboard-light.png', SNAP);
 
   // Toggle to dark client-side (keeps the admin session), then re-shoot.
-  await page.getByRole('button', { name: /switch to dark theme/i }).click();
+  await page.getByRole('button', { name: '切换到深色主题' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await settle(page);
   await expect(page).toHaveScreenshot('admin-dashboard-dark.png', SNAP);

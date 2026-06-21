@@ -6,6 +6,11 @@ import type { AttributeSchema } from '@/services/admin-types';
  * `unit` here are OPTIONAL frontend display hints (Simplified Chinese for the
  * zh-CN admin). A live backend may omit them, in which case the form derives a
  * label from `name`. `name`/`options`/values stay as stored data (English).
+ *
+ * Options here mirror the storefront fixtures (fixtures/products.ts) so seeded
+ * products validate against their own type. The live backend's migration-0007
+ * seed may use a leaner set / different casing (e.g. 'tkl' vs 'TKL'); reconcile
+ * the option sets with §9.5 when wiring live — flagged, not changed unilaterally.
  */
 export const ADMIN_ATTRIBUTE_SCHEMAS: Record<string, AttributeSchema> = {
   keyboard: {

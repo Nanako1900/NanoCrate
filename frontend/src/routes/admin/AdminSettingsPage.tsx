@@ -46,7 +46,7 @@ export function AdminSettingsPage() {
                     onClick={() => setPreference(opt.value)}
                     className={cn(
                       'flex flex-col items-start gap-0.5 rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive',
-                      selected ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface hover:border-line-strong',
+                      selected ? 'border-accent bg-accent-soft text-accent-soft-ink' : 'border-line bg-surface hover:border-line-strong',
                     )}
                   >
                     <span className="text-sm font-medium">{opt.label}</span>

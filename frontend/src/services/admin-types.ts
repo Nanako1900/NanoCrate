@@ -203,6 +203,9 @@ export interface VariantWriteInput {
   currency?: string;
   status?: ProductStatus;
   attributes: Record<string, string | number | boolean>;
+  // frontend-only convenience: §9.5 variant create starts at available:0 and all
+  // stock moves go through restock. The mock seeds this as a `restock` ledger
+  // entry; a live backend would ignore it (set initial stock via restock).
   available: number;
 }
 

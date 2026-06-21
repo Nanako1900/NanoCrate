@@ -32,7 +32,8 @@
   --accent: oklch(72% 0.155 62);
   --accent-strong: oklch(64% 0.165 56); /* hover / pressed */
   --accent-soft: oklch(93% 0.05 75); /* tinted backgrounds */
-  --accent-ink: oklch(24% 0.04 60); /* text on accent fills */
+  --accent-ink: oklch(24% 0.04 60); /* text on the SOLID accent fill */
+  --accent-soft-ink: oklch(38% 0.11 62); /* text on the accent-soft TINT (AA) */
 
   /* ---- Color · interactive (steel blue — links, focus, selection) ---- */
   --interactive: oklch(52% 0.12 248);
@@ -141,7 +142,8 @@
   --accent: oklch(78% 0.15 66);
   --accent-strong: oklch(83% 0.155 66); /* hover / pressed — brighter on dark */
   --accent-soft: oklch(32% 0.06 66); /* tinted fills */
-  --accent-ink: oklch(16% 0.03 60); /* text on accent fills (stays dark) */
+  --accent-ink: oklch(16% 0.03 60); /* text on the SOLID accent fill (stays dark) */
+  --accent-soft-ink: oklch(87% 0.11 72); /* text on the accent-soft TINT (AA) */
 
   /* ---- Interactive (steel blue, lifted) ---- */
   --interactive: oklch(72% 0.12 246);
@@ -193,6 +195,7 @@
   --accent-strong: oklch(47% 0.21 274);
   --accent-soft: oklch(95% 0.035 274);
   --accent-ink: oklch(99% 0.01 274);
+  --accent-soft-ink: oklch(42% 0.18 274); /* dark indigo text on the light tint */
   --interactive: oklch(53% 0.21 274);
   --interactive-strong: oklch(46% 0.21 274);
   --interactive-soft: oklch(95% 0.035 274);
@@ -215,6 +218,7 @@
   --accent-strong: oklch(79% 0.15 274);
   --accent-soft: oklch(32% 0.09 274);
   --accent-ink: oklch(16% 0.04 274);
+  --accent-soft-ink: oklch(86% 0.12 274); /* light indigo text on the dark tint */
   --interactive: oklch(74% 0.16 274);
   --interactive-strong: oklch(82% 0.13 274);
   --interactive-soft: oklch(30% 0.08 274);

@@ -109,7 +109,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         />
         <kbd className="hidden rounded border border-line bg-surface-sunken px-1.5 py-0.5 font-mono text-2xs text-ink-faint sm:inline">esc</kbd>
       </div>
-      <ul id="command-list" role="listbox" aria-label="Commands" className="max-h-80 overflow-y-auto p-2">
+      <ul id="command-list" role="listbox" aria-label="命令" className="max-h-80 overflow-y-auto p-2">
         {filtered.length === 0 ? (
           <li className="px-3 py-6 text-center text-sm text-ink-faint">没有匹配“{query}”的命令。</li>
         ) : (
@@ -125,7 +125,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   onMouseMove={() => setActive(i)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                    isActive ? 'bg-accent-soft text-accent-ink' : 'text-ink',
+                    isActive ? 'bg-accent-soft text-accent-soft-ink' : 'text-ink',
                   )}
                 >
                   <Icon size={16} className="shrink-0 opacity-70" />

@@ -15,7 +15,8 @@ const PAIRS: ReadonlyArray<[string, string, number]> = [
   ['--ink-faint', '--surface', 4.5], // tightest: small mono labels
   ['--ink-faint', '--paper', 4.5],
   ['--ink-invert', '--surface-invert', 4.5],
-  ['--accent-ink', '--accent', 4.5], // primary button label
+  ['--accent-ink', '--accent', 4.5], // primary button label (solid accent)
+  ['--accent-soft-ink', '--accent-soft', 4.5], // chip/active-nav label on the soft tint
   ['--interactive', '--paper', 4.5], // links
   ['--stock-in-ink', '--stock-in-bg', 4.5],
   ['--stock-low-ink', '--stock-low-bg', 4.5],

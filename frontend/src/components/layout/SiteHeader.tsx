@@ -20,7 +20,7 @@ function CategoryLink({ to, active, children }: CategoryLinkProps) {
       aria-current={active ? 'page' : undefined}
       className={cn(
         'rounded-md px-3 py-1.5 text-sm transition-colors duration-150',
-        active ? 'bg-accent-soft text-accent-ink' : 'text-ink-soft hover:bg-surface-sunken hover:text-ink',
+        active ? 'bg-accent-soft text-accent-soft-ink' : 'text-ink-soft hover:bg-surface-sunken hover:text-ink',
       )}
     >
       {children}
