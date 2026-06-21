@@ -96,6 +96,9 @@ func NewConsumer(name string, pool *pgxpool.Pool, process ProcessFunc, opts ...C
 // Handle processes one event idempotently. Returning nil acks the message;
 // returning an error asks the bus to redeliver (used only for infra failures).
 func (c *Consumer) Handle(ctx context.Context, e Event) error {
+	ctx, end := startSpanFn(ctx, e.TraceParent, "consume "+e.Subject)
+	defer end()
+
 	consumed, err := c.q.IsEventConsumed(ctx, eventsdb.IsEventConsumedParams{Consumer: c.name, EventID: e.ID})
 	if err != nil {
 		return fmt.Errorf("dedup check %s/%s: %w", c.name, e.ID, err) // infra → redeliver

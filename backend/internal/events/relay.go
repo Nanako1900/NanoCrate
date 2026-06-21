@@ -41,13 +41,16 @@ func (r *Relay) PublishPending(ctx context.Context) (int, error) {
 	published := 0
 	for _, row := range rows {
 		e := Event{
-			ID:      strconv.FormatInt(row.ID, 10),
-			Type:    row.EventType,
-			Subject: SubjectFor(row.EventType),
-			Payload: row.Payload,
-			TraceID: traceIDFromContext(ctx),
+			ID:          strconv.FormatInt(row.ID, 10),
+			Type:        row.EventType,
+			Subject:     SubjectFor(row.EventType),
+			Payload:     row.Payload,
+			TraceParent: row.TraceParent,
 		}
-		if err := r.bus.Publish(ctx, e); err != nil {
+		pubCtx, end := startSpanFn(ctx, e.TraceParent, "relay.publish "+e.Subject)
+		err := r.bus.Publish(pubCtx, e)
+		end()
+		if err != nil {
 			return published, fmt.Errorf("publish outbox %d: %w", row.ID, err)
 		}
 		if err := r.q.MarkOutboxPublished(ctx, row.ID); err != nil {

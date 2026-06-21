@@ -28,14 +28,16 @@ var errDuplicateOrder = errors.New("duplicate order for idempotency key")
 // was no longer pending. The sweeper skips it.
 var errOrderNotCancelled = errors.New("order no longer pending")
 
-// Metrics receives checkout business signals (orders paid).
+// Metrics receives checkout business signals (orders paid, checkout failures).
 type Metrics interface {
 	IncOrdersPaid()
+	IncCheckoutFailure(reason string)
 }
 
 type noopMetrics struct{}
 
-func (noopMetrics) IncOrdersPaid() {}
+func (noopMetrics) IncOrdersPaid()            {}
+func (noopMetrics) IncCheckoutFailure(string) {}
 
 // Service runs the checkout saga and settles Stripe webhooks.
 type Service struct {
@@ -96,6 +98,31 @@ type Result struct {
 // cookie. This blocks the cross-session IDOR of checking out an arbitrary guest
 // cart by id (B4).
 func (s *Service) Checkout(ctx context.Context, userID string, cartID uuid.UUID, cookieCartID *uuid.UUID, idempotencyKey string) (Result, error) {
+	res, err := s.runCheckout(ctx, userID, cartID, cookieCartID, idempotencyKey)
+	if err != nil {
+		s.metrics.IncCheckoutFailure(classifyCheckoutFailure(err))
+	}
+	return res, err
+}
+
+// classifyCheckoutFailure maps a checkout error to a metric reason label.
+func classifyCheckoutFailure(err error) string {
+	var oos *OutOfStockError
+	switch {
+	case errors.As(err, &oos):
+		return "out_of_stock"
+	case errors.Is(err, ErrCartNotActive):
+		return "cart_not_active"
+	case errors.Is(err, ErrCartNotFound):
+		return "cart_not_found"
+	case errors.Is(err, ErrEmptyCart), errors.Is(err, ErrLineQtyTooLarge):
+		return "validation_failed"
+	default:
+		return "internal"
+	}
+}
+
+func (s *Service) runCheckout(ctx context.Context, userID string, cartID uuid.UUID, cookieCartID *uuid.UUID, idempotencyKey string) (Result, error) {
 	idemParams := orderdb.GetOrderByIdempotencyKeyParams{UserID: userID, IdempotencyKey: idempotencyKey}
 	if existing, err := s.orderQ.GetOrderByIdempotencyKey(ctx, idemParams); err == nil {
 		return s.replay(ctx, existing)

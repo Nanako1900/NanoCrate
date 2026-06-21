@@ -2,7 +2,7 @@
 
 -- name: ListUnpublishedOutbox :many
 -- relay 轮询:按 id 顺序取未发布的 outbox 行(FIFO)。
-SELECT id, aggregate_type, aggregate_id, event_type, payload, created_at
+SELECT id, aggregate_type, aggregate_id, event_type, payload, trace_parent, created_at
 FROM outbox
 WHERE published_at IS NULL
 ORDER BY id

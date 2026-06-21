@@ -93,6 +93,7 @@ type Outbox struct {
 	Payload       json.RawMessage    `json:"payload"`
 	CreatedAt     time.Time          `json:"created_at"`
 	PublishedAt   pgtype.Timestamptz `json:"published_at"`
+	TraceParent   string             `json:"trace_parent"`
 }
 
 type ProcessedEvent struct {

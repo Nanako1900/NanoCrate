@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
 	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
@@ -40,7 +41,13 @@ func newRouter(d apiDeps) *gin.Engine {
 	}
 
 	r := gin.New()
-	r.Use(web.RequestID(), web.Logger(d.logger), web.Recovery(d.logger))
+	r.Use(
+		web.RequestID(),
+		otelgin.Middleware("nanocrate-api"),
+		web.Logger(d.logger),
+		web.Recovery(d.logger),
+		web.CORS(d.cfg.CORSAllowedOrigins),
+	)
 
 	r.GET("/healthz", healthz)
 	r.GET("/readyz", readyz(d.pool))

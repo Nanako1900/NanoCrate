@@ -2,19 +2,19 @@ package events
 
 import "context"
 
-// traceIDFromContext returns the active trace id for async trace linking. It is a
-// no-op until OpenTelemetry is wired (P3a-6), where it returns the span's trace id
-// so producer→NATS→consumer joins one trace.
-func traceIDFromContext(ctx context.Context) string {
-	return traceIDFn(ctx)
+// SpanFunc starts a span named name, linked to the W3C traceParent when non-empty,
+// and returns the child context and an end function. It lets the events package
+// participate in tracing without importing OpenTelemetry (avoiding an import cycle
+// with platform/observability, which installs the real implementation).
+type SpanFunc func(ctx context.Context, traceParent, name string) (context.Context, func())
+
+var startSpanFn SpanFunc = func(ctx context.Context, _, _ string) (context.Context, func()) {
+	return ctx, func() {}
 }
 
-// traceIDFn is swapped to an OTel-backed implementation at startup; default empty.
-var traceIDFn = func(context.Context) string { return "" }
-
-// SetTraceIDFunc installs the trace-id extractor (called once from observability init).
-func SetTraceIDFunc(fn func(context.Context) string) {
+// SetSpanFunc installs the span starter (called once from observability init).
+func SetSpanFunc(fn SpanFunc) {
 	if fn != nil {
-		traceIDFn = fn
+		startSpanFn = fn
 	}
 }

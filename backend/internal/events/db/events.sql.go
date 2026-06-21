@@ -115,7 +115,7 @@ func (q *Queries) ListDeadLetters(ctx context.Context, arg ListDeadLettersParams
 
 const listUnpublishedOutbox = `-- name: ListUnpublishedOutbox :many
 
-SELECT id, aggregate_type, aggregate_id, event_type, payload, created_at
+SELECT id, aggregate_type, aggregate_id, event_type, payload, trace_parent, created_at
 FROM outbox
 WHERE published_at IS NULL
 ORDER BY id
@@ -128,6 +128,7 @@ type ListUnpublishedOutboxRow struct {
 	AggregateID   uuid.UUID       `json:"aggregate_id"`
 	EventType     string          `json:"event_type"`
 	Payload       json.RawMessage `json:"payload"`
+	TraceParent   string          `json:"trace_parent"`
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
@@ -148,6 +149,7 @@ func (q *Queries) ListUnpublishedOutbox(ctx context.Context, limit int32) ([]Lis
 			&i.AggregateID,
 			&i.EventType,
 			&i.Payload,
+			&i.TraceParent,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

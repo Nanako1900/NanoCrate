@@ -12,14 +12,15 @@ import (
 )
 
 // Event is a normalized domain event flowing through the bus. ID is a stable,
-// unique id (the outbox row id) used for at-least-once dedup; TraceID carries the
-// W3C traceparent so the async leg joins the producer's trace.
+// unique id (the outbox row id) used for at-least-once dedup; TraceParent carries
+// the W3C traceparent captured when the outbox row was written, so the async
+// publish/consume legs join the original (sync) producer trace.
 type Event struct {
-	ID      string          `json:"id"`
-	Type    string          `json:"type"`
-	Subject string          `json:"subject"`
-	Payload json.RawMessage `json:"payload"`
-	TraceID string          `json:"trace_id,omitempty"`
+	ID          string          `json:"id"`
+	Type        string          `json:"type"`
+	Subject     string          `json:"subject"`
+	Payload     json.RawMessage `json:"payload"`
+	TraceParent string          `json:"traceparent,omitempty"`
 }
 
 // Handler processes one delivered event. Returning a non-nil error signals the
