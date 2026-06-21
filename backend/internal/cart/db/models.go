@@ -31,6 +31,24 @@ type CartItem struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ConsumedEvent struct {
+	Consumer  string    `json:"consumer"`
+	EventID   string    `json:"event_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type DeadLetter struct {
+	ID        int64           `json:"id"`
+	Consumer  string          `json:"consumer"`
+	EventID   string          `json:"event_id"`
+	Subject   string          `json:"subject"`
+	EventType string          `json:"event_type"`
+	Payload   json.RawMessage `json:"payload"`
+	Error     string          `json:"error"`
+	Attempts  int32           `json:"attempts"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
 type Inventory struct {
 	VariantID uuid.UUID `json:"variant_id"`
 	Available int32     `json:"available"`
@@ -75,6 +93,7 @@ type Outbox struct {
 	Payload       json.RawMessage    `json:"payload"`
 	CreatedAt     time.Time          `json:"created_at"`
 	PublishedAt   pgtype.Timestamptz `json:"published_at"`
+	TraceParent   string             `json:"trace_parent"`
 }
 
 type ProcessedEvent struct {
