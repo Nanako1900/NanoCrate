@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import type { ProductDetail as ProductDetailModel, Variant } from '@/services/types';
 import { formatPrice } from '@/lib/format';
 import { productImageSrc } from '@/lib/productImage';
+import { useAddToCart } from '@/hooks/useCart';
+import { useCartUI } from '@/components/cart/CartUIContext';
 import { Button } from '@/components/ui/Button';
 import { StockIndicator } from '@/components/ui/StockIndicator';
 import { VariantPicker } from './VariantPicker';
@@ -18,7 +20,8 @@ interface ProductDetailProps {
 
 export function ProductDetail({ product }: ProductDetailProps) {
   const [selectedId, setSelectedId] = useState<string>(() => defaultVariant(product.variants)?.id ?? '');
-  const [added, setAdded] = useState(false);
+  const addToCart = useAddToCart();
+  const { open } = useCartUI();
 
   const selected = useMemo(
     () => product.variants.find((variant) => variant.id === selectedId) ?? defaultVariant(product.variants),
@@ -28,7 +31,25 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   function handleSelect(id: string) {
     setSelectedId(id);
-    setAdded(false);
+    addToCart.reset();
+  }
+
+  function handleAdd() {
+    if (!selected) return;
+    addToCart.mutate(
+      {
+        variant_id: selected.id,
+        qty: 1,
+        preview: {
+          variant_id: selected.id,
+          sku: selected.sku,
+          name: `${product.name} · ${selected.name}`,
+          unit_price_cents: selected.price_cents,
+          available: selected.available,
+        },
+      },
+      { onSuccess: () => open() },
+    );
   }
 
   return (
@@ -82,17 +103,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
           <div className="flex flex-col gap-2">
             <Button
-              onClick={() => setAdded(true)}
-              disabled={soldOut}
+              onClick={handleAdd}
+              disabled={soldOut || addToCart.isPending}
               size="md"
               className="w-full sm:w-auto sm:min-w-56"
             >
-              {soldOut ? 'Out of stock' : 'Add to cart'}
+              {soldOut ? 'Out of stock' : addToCart.isPending ? 'Adding…' : 'Add to cart'}
             </Button>
             <p aria-live="polite" className="text-2xs text-ink-faint">
-              {added && !soldOut
-                ? `Added ${selected?.sku} — cart & checkout arrive in Phase 2.`
-                : 'Cart & checkout arrive in Phase 2 of this mock-first build.'}
+              {addToCart.isError
+                ? 'Couldn’t add to cart. Please try again.'
+                : addToCart.isSuccess && !soldOut
+                  ? `Added ${selected?.sku} to your cart.`
+                  : ' '}
             </p>
           </div>
 
