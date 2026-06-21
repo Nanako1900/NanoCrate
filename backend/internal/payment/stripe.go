@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/paymentintent"
@@ -27,8 +28,10 @@ func NewStripeProvider(secretKey, webhookSecret string) *StripeProvider {
 // CreatePaymentIntent creates a Stripe PaymentIntent (idempotent via the key).
 func (s *StripeProvider) CreatePaymentIntent(ctx context.Context, in CreateIntentInput) (Intent, error) {
 	params := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(in.AmountCents),
-		Currency: stripe.String(in.Currency),
+		Amount: stripe.Int64(in.AmountCents),
+		// Stripe requires a lowercase ISO currency code; carts/orders carry it
+		// uppercase (e.g. "USD", contract §9.3), so downcase before the call.
+		Currency: stripe.String(strings.ToLower(in.Currency)),
 	}
 	params.Context = ctx
 	params.AddMetadata("order_id", in.OrderID)
