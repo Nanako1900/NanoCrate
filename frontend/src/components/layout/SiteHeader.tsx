@@ -43,7 +43,7 @@ function CartButton() {
         <circle cx="18" cy="20" r="1" />
       </svg>
       {count > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-accent px-1 font-mono text-[0.625rem] font-semibold leading-4 text-accent-ink">
+        <span className="absolute -right-1.5 -top-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-accent px-1 font-mono text-2xs font-semibold leading-4 text-accent-ink">
           {count}
         </span>
       )}
@@ -55,24 +55,52 @@ function AccountMenu() {
   const { status, user, login, logout } = useAuth();
   const detailsRef = useRef<HTMLDetailsElement>(null);
 
-  // Close the disclosure on Escape (refocusing the trigger) or an outside click.
+  // Disclosure menu: on open, move focus to the first item and constrain Tab
+  // within the menu; Escape (refocusing the trigger) or an outside click closes.
   useEffect(() => {
     const details = detailsRef.current;
     if (!details) return;
+
+    const items = () =>
+      Array.from(details.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'));
+
+    function onToggle() {
+      if (details!.open) items()[0]?.focus();
+    }
     function onDocClick(event: MouseEvent) {
-      if (details && details.open && !details.contains(event.target as Node)) {
-        details.open = false;
-      }
+      if (details!.open && !details!.contains(event.target as Node)) details!.open = false;
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && details && details.open) {
-        details.open = false;
-        details.querySelector('summary')?.focus();
+      if (!details!.open) return;
+      if (event.key === 'Escape') {
+        details!.open = false;
+        details!.querySelector('summary')?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusables = items();
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      const index = active ? focusables.indexOf(active) : -1;
+      if (index === -1) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
+
+    details.addEventListener('toggle', onToggle);
     document.addEventListener('click', onDocClick);
     document.addEventListener('keydown', onKeyDown);
     return () => {
+      details.removeEventListener('toggle', onToggle);
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('keydown', onKeyDown);
     };

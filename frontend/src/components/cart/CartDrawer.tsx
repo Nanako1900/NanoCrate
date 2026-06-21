@@ -35,13 +35,25 @@ export function CartDrawer() {
       }
       if (event.key !== 'Tab' || !panel) return;
       const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusables.length === 0) return;
+      if (focusables.length === 0) {
+        // Nothing tabbable inside — keep focus on the panel itself.
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const active = document.activeElement as HTMLElement | null;
+      const index = active ? focusables.indexOf(active) : -1;
+      if (index === -1) {
+        // Focus escaped the tracked set (the panel container, or a control that
+        // just became disabled) — pull it back to an end so Tab can't leak out.
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && active === last) {
         event.preventDefault();
         first.focus();
       }
