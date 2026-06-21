@@ -149,8 +149,9 @@ func TestIntegration_ListProductsPaginationAndFilter(t *testing.T) {
 	if code != http.StatusOK || !resp.Success {
 		t.Fatalf("status=%d success=%v", code, resp.Success)
 	}
-	if resp.Meta == nil || resp.Meta.Total != 3 || resp.Meta.Limit != 2 {
-		t.Fatalf("meta = %+v, want total=3 limit=2", resp.Meta)
+	// 9 active keyboards after the 0010 demo-seed expansion (3 base + 6 added).
+	if resp.Meta == nil || resp.Meta.Total != 9 || resp.Meta.Limit != 2 {
+		t.Fatalf("meta = %+v, want total=9 limit=2", resp.Meta)
 	}
 	var items []struct {
 		Slug           string `json:"slug"`

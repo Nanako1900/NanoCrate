@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nanocrate-config
+  namespace: nanocrate
+data:
+  APP_ENV: "production"
+  HTTP_PORT: "8080"
+  KEYCLOAK_ISSUER: "http://nanocrate-keycloak:8081/realms/nanocrate"
+  KEYCLOAK_JWKS_URL: "http://nanocrate-keycloak:8081/realms/nanocrate/protocol/openid-connect/certs"
+  KEYCLOAK_AUDIENCE: "nanocrate-api"
+  NATS_URL: "nats://nanocrate-nats:4222"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "nanocrate-jaeger:4317"
+  CORS_ALLOWED_ORIGINS: "https://nanocrate.example.com"
+  EMBEDDING_PROVIDER: "stub"
+  WORKER_METRICS_ADDR: ":9091"
+  SMTP_HOST: ""
+  SMTP_PORT: "1025"
+  SMTP_FROM: "no-reply@nanocrate.example.com"
+---
+# Secret TEMPLATE — replace the placeholders (or supply via a sealed-secret /
+# external-secrets / CI). Never commit real values.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nanocrate-secrets
+  namespace: nanocrate
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://nano:nano@nanocrate-postgres:5432/nanocrate?sslmode=disable"
+  STRIPE_SECRET_KEY: "sk_test_REPLACE_ME"
+  STRIPE_WEBHOOK_SECRET: "whsec_REPLACE_ME"
+  OPENAI_API_KEY: ""

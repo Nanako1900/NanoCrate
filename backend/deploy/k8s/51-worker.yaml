@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanocrate-worker
+  namespace: nanocrate
+spec:
+  selector: { app: nanocrate-worker }
+  ports: [{ name: metrics, port: 9091, targetPort: 9091 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanocrate-worker
+  namespace: nanocrate
+spec:
+  # Single replica: the outbox relay/sweepers are simplest as a singleton (the
+  # consumers are idempotent, but running one avoids redundant publishes).
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: nanocrate-worker } }
+  template:
+    metadata: { labels: { app: nanocrate-worker } }
+    spec:
+      containers:
+        - name: worker
+          image: nanocrate-backend:latest
+          command: ["/app/worker"]
+          ports: [{ containerPort: 9091 }]
+          envFrom:
+            - configMapRef: { name: nanocrate-config }
+            - secretRef: { name: nanocrate-secrets }
+          readinessProbe:
+            httpGet: { path: /metrics, port: 9091 }
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "50m", memory: "96Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }

@@ -20,6 +20,8 @@ type Config struct {
 	OTLPEndpoint        string   // OTEL_EXPORTER_OTLP_ENDPOINT (host:port); empty = no exporter
 	CORSAllowedOrigins  []string // credentialed CORS allowlist (docs §9.2.1)
 	SMTP                SMTP
+	EmbeddingProvider   string // "stub" (default, deterministic offline) | "openai"
+	OpenAIAPIKey        string // OPENAI_API_KEY; required when EmbeddingProvider=openai
 }
 
 // Keycloak holds the OIDC Resource Server settings (signature + iss/aud validation).
@@ -62,6 +64,8 @@ func Load() (Config, error) {
 			Password: os.Getenv("SMTP_PASSWORD"),
 			From:     getDefault("SMTP_FROM", "no-reply@nanocrate.local"),
 		},
+		EmbeddingProvider: getDefault("EMBEDDING_PROVIDER", "stub"),
+		OpenAIAPIKey:      os.Getenv("OPENAI_API_KEY"),
 	}
 
 	required := []struct {

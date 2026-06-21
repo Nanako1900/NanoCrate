@@ -12,7 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	admindb "github.com/Nanako1900/NanoCrate/backend/internal/admin/db"
+	eventsdb "github.com/Nanako1900/NanoCrate/backend/internal/events/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/inventory"
+	"github.com/Nanako1900/NanoCrate/backend/internal/platform/observability"
 )
 
 const (
@@ -28,13 +30,27 @@ var (
 
 // Service implements the admin backend over admindb + the inventory engine.
 type Service struct {
-	q   *admindb.Queries
-	inv *inventory.Service
+	pool *pgxpool.Pool
+	q    *admindb.Queries
+	inv  *inventory.Service
 }
 
 // NewService builds the admin service.
 func NewService(pool *pgxpool.Pool, inv *inventory.Service) *Service {
-	return &Service{q: admindb.New(pool), inv: inv}
+	return &Service{pool: pool, q: admindb.New(pool), inv: inv}
+}
+
+// emitProductUpserted writes a ProductUpserted outbox row in the same tx as the
+// product write, so search (re)indexing is driven reliably off the outbox relay.
+func emitProductUpserted(ctx context.Context, tx pgx.Tx, productID uuid.UUID) error {
+	payload, _ := json.Marshal(map[string]string{"product_id": productID.String()})
+	return eventsdb.New(tx).InsertOutbox(ctx, eventsdb.InsertOutboxParams{
+		AggregateType: "product",
+		AggregateID:   productID,
+		EventType:     "ProductUpserted",
+		Payload:       payload,
+		TraceParent:   observability.TraceParent(ctx),
+	})
 }
 
 // ListProducts returns one page of products plus the total for the same filters.
@@ -87,9 +103,17 @@ func (s *Service) CreateProduct(ctx context.Context, req CreateProductRequest) (
 	if err := validateAttributes(pt.AttributeSchema, req.Attributes); err != nil {
 		return ProductView{}, err
 	}
-	row, err := s.q.AdminCreateProduct(ctx, admindb.AdminCreateProductParams{
-		Slug: req.Slug, ProductTypeID: pt.ID, Name: req.Name, Description: req.Description,
-		Status: status, Attributes: nonNilObject(req.Attributes), ImageUrl: req.ImageURL,
+	var row admindb.AdminCreateProductRow
+	err = s.inTx(ctx, func(tx pgx.Tx) error {
+		var e error
+		row, e = s.q.WithTx(tx).AdminCreateProduct(ctx, admindb.AdminCreateProductParams{
+			Slug: req.Slug, ProductTypeID: pt.ID, Name: req.Name, Description: req.Description,
+			Status: status, Attributes: nonNilObject(req.Attributes), ImageUrl: req.ImageURL,
+		})
+		if e != nil {
+			return e
+		}
+		return emitProductUpserted(ctx, tx, row.ID)
 	})
 	if isUniqueViolation(err) {
 		return ProductView{}, ErrSlugConflict
@@ -131,9 +155,17 @@ func (s *Service) UpdateProduct(ctx context.Context, id uuid.UUID, req UpdatePro
 	if err := validateAttributes(pt.AttributeSchema, attrs); err != nil {
 		return ProductView{}, err
 	}
-	row, err := s.q.AdminUpdateProduct(ctx, admindb.AdminUpdateProductParams{
-		ID: id, Slug: slug, Name: name, Description: desc, Status: status,
-		Attributes: nonNilObject(attrs), ImageUrl: imageURL,
+	var row admindb.AdminUpdateProductRow
+	err = s.inTx(ctx, func(tx pgx.Tx) error {
+		var e error
+		row, e = s.q.WithTx(tx).AdminUpdateProduct(ctx, admindb.AdminUpdateProductParams{
+			ID: id, Slug: slug, Name: name, Description: desc, Status: status,
+			Attributes: nonNilObject(attrs), ImageUrl: imageURL,
+		})
+		if e != nil {
+			return e
+		}
+		return emitProductUpserted(ctx, tx, id)
 	})
 	if isUniqueViolation(err) {
 		return ProductView{}, ErrSlugConflict
@@ -323,6 +355,18 @@ func (s *Service) ListOrders(ctx context.Context, status *string, page, limit in
 }
 
 // --- helpers ---
+
+func (s *Service) inTx(ctx context.Context, fn func(pgx.Tx) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
 
 func pageOffset(page, limit int) (int32, int32) {
 	if page < 1 {

@@ -1,0 +1,57 @@
+name: backend-ci
+
+# CI for the Go backend: build, vet, gofmt, staticcheck, sqlc-clean, and the full
+# test suite (unit + testcontainers integration; Docker is available on the
+# ubuntu runner). Scoped to backend changes.
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend-ci.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install dev tools (sqlc, staticcheck)
+        run: |
+          # Pin sqlc to the version the committed generated code was produced with,
+          # so the diff-clean check is stable across sqlc releases.
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: gofmt (must be clean)
+        run: test -z "$(gofmt -l .)" || { echo 'gofmt needs:'; gofmt -l .; exit 1; }
+
+      - name: sqlc generate (must be diff-clean)
+        run: |
+          sqlc generate
+          git diff --exit-code || { echo 'sqlc output is stale; run make sqlc'; exit 1; }
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: staticcheck ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test (unit + testcontainers integration)
+        run: go test -tags=integration -count=1 ./...

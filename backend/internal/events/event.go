@@ -45,11 +45,12 @@ var ErrBusClosed = errors.New("event bus closed")
 
 // Subjects: a stable, hierarchical namespace under "nanocrate.".
 const (
-	SubjectPrefix         = "nanocrate."
-	SubjectAllOrders      = "nanocrate.order.>"
-	SubjectOrderPlaced    = "nanocrate.order.placed"
-	SubjectPaymentSucceed = "nanocrate.payment.succeeded"
-	SubjectPaymentFailed  = "nanocrate.payment.failed"
+	SubjectPrefix          = "nanocrate."
+	SubjectAllOrders       = "nanocrate.order.>"
+	SubjectOrderPlaced     = "nanocrate.order.placed"
+	SubjectPaymentSucceed  = "nanocrate.payment.succeeded"
+	SubjectPaymentFailed   = "nanocrate.payment.failed"
+	SubjectProductUpserted = "nanocrate.product.upserted"
 )
 
 // eventTypeSubjects maps domain event types (as written to the outbox) to subjects.
@@ -57,6 +58,7 @@ var eventTypeSubjects = map[string]string{
 	"OrderPlaced":      SubjectOrderPlaced,
 	"PaymentSucceeded": SubjectPaymentSucceed,
 	"PaymentFailed":    SubjectPaymentFailed,
+	"ProductUpserted":  SubjectProductUpserted,
 }
 
 // SubjectFor maps a domain event type to its NATS subject. Unknown types fall

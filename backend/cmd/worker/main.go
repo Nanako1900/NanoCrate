@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,8 +16,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 
+	admindb "github.com/Nanako1900/NanoCrate/backend/internal/admin/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/checkout"
 	"github.com/Nanako1900/NanoCrate/backend/internal/events"
 	eventsdb "github.com/Nanako1900/NanoCrate/backend/internal/events/db"
@@ -28,6 +32,7 @@ import (
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/logging"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/metrics"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/observability"
+	"github.com/Nanako1900/NanoCrate/backend/internal/search"
 )
 
 const (
@@ -112,6 +117,21 @@ func main() {
 	}
 	defer func() { _ = sub.Unsubscribe() }()
 
+	// Consumer: (re)index a product into the search engine on ProductUpserted.
+	searchProvider := search.NewPgVector(pool, search.NewEmbedder(cfg.EmbeddingProvider, cfg.OpenAIAPIKey, logger))
+	indexer := events.NewConsumer("search-indexer", pool, search.IndexEventHandler(searchProvider, adminLoader{q: admindb.New(pool)}, logger),
+		events.WithMaxAttempts(consumerMaxRetry),
+		events.WithBackoff(consumerBackoff),
+		events.WithConsumerMetrics(reg),
+		events.WithConsumerLogger(logger),
+	)
+	idxSub, err := bus.Subscribe(ctx, events.SubjectProductUpserted, "search-indexer", indexer.Handle)
+	if err != nil {
+		logger.Error("subscribe search-indexer failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = idxSub.Unsubscribe() }()
+
 	// Reservation sweeper: release expired held reservations (SPEC §7).
 	go runTicker(ctx, reservationSweep, func() {
 		n, err := inv.ReleaseExpired(ctx, sweepBatch)
@@ -184,6 +204,20 @@ func getEnvDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// adminLoader adapts admindb to search.ProductLoader for the index consumer.
+type adminLoader struct{ q *admindb.Queries }
+
+func (l adminLoader) LoadProductForIndex(ctx context.Context, id uuid.UUID) (string, string, json.RawMessage, bool, error) {
+	p, err := l.q.AdminGetProduct(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", nil, false, nil
+	}
+	if err != nil {
+		return "", "", nil, false, err
+	}
+	return p.Name, p.Description, p.Attributes, true, nil
 }
 
 // runTicker calls fn every interval until ctx is cancelled.

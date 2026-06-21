@@ -228,7 +228,13 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
     ] } }
 
 // POST /api/v1/search   body: { "query": "安静 适合办公的全尺寸热插拔", "limit": 10 }
-{ "success": true, "data": { "hits": [ { "slug": "nano-full", "score": 0.82, "name": "..." } ] } }
+// 混合检索(SPEC §8):语义(pgvector 余弦 kNN)+ 关键词(tsvector ts_rank),RRF 融合。
+// limit 缺省 10、上限 50(query 上限 512 字符);hit 含 type(品类 key);
+// score = 融合相关度(越大越相关,非 0–1 概率,仅用于排序)。
+// 注:离线默认用确定性 stub embedder + 英文全文检索,中文/CJK 语义需 EMBEDDING_PROVIDER=openai;
+// 离线 demo 用英文 query(如 "a quiet full size keyboard for the office")。
+{ "success": true, "data": { "hits": [
+    { "slug": "nano-full", "name": "Nano Full", "type": "keyboard", "score": 0.0312 } ] } }
 
 // POST /api/v1/checkout   header: Idempotency-Key: <uuid>   body: { "cart_id": "..." }
 { "success": true, "data": { "order_id": "o_01", "client_secret": "pi_..._secret_..." } }

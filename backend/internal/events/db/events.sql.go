@@ -54,6 +54,33 @@ func (q *Queries) InsertDeadLetter(ctx context.Context, arg InsertDeadLetterPara
 	return err
 }
 
+const insertOutbox = `-- name: InsertOutbox :exec
+
+INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload, trace_parent)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertOutboxParams struct {
+	AggregateType string          `json:"aggregate_type"`
+	AggregateID   uuid.UUID       `json:"aggregate_id"`
+	EventType     string          `json:"event_type"`
+	Payload       json.RawMessage `json:"payload"`
+	TraceParent   string          `json:"trace_parent"`
+}
+
+// 事件基础设施查询(outbox relay 发布 + 消费者幂等去重 + DLQ)。
+// 在业务事务内写出箱(与产品写入等同事务,保证可靠投递)。
+func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
+	_, err := q.db.Exec(ctx, insertOutbox,
+		arg.AggregateType,
+		arg.AggregateID,
+		arg.EventType,
+		arg.Payload,
+		arg.TraceParent,
+	)
+	return err
+}
+
 const isEventConsumed = `-- name: IsEventConsumed :one
 SELECT EXISTS(
     SELECT 1 FROM consumed_events WHERE consumer = $1 AND event_id = $2
@@ -116,7 +143,6 @@ func (q *Queries) ListDeadLetters(ctx context.Context, arg ListDeadLettersParams
 }
 
 const listUnpublishedOutbox = `-- name: ListUnpublishedOutbox :many
-
 SELECT id, aggregate_type, aggregate_id, event_type, payload, trace_parent, created_at
 FROM outbox
 WHERE published_at IS NULL
@@ -134,7 +160,6 @@ type ListUnpublishedOutboxRow struct {
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
-// 事件基础设施查询(outbox relay 发布 + 消费者幂等去重 + DLQ)。
 // relay 轮询:按 id 顺序取未发布的 outbox 行(FIFO)。
 func (q *Queries) ListUnpublishedOutbox(ctx context.Context, limit int32) ([]ListUnpublishedOutboxRow, error) {
 	rows, err := q.db.Query(ctx, listUnpublishedOutbox, limit)

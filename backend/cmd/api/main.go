@@ -23,6 +23,8 @@ import (
 	"github.com/Nanako1900/NanoCrate/backend/internal/inventory"
 	"github.com/Nanako1900/NanoCrate/backend/internal/order"
 	"github.com/Nanako1900/NanoCrate/backend/internal/payment"
+	"github.com/Nanako1900/NanoCrate/backend/internal/search"
+
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/config"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/logging"
@@ -77,6 +79,7 @@ func main() {
 	orderHandler := order.NewHandler(order.NewService(pool))
 	checkoutHandler := checkout.NewHandler(checkout.NewService(pool, inventoryService, selectPaymentProvider(cfg, logger), metricsRegistry))
 	adminHandler := admin.NewHandler(admin.NewService(pool, inventoryService))
+	searchHandler := search.NewHandler(search.NewPgVector(pool, search.NewEmbedder(cfg.EmbeddingProvider, cfg.OpenAIAPIKey, logger)))
 
 	router := newRouter(apiDeps{
 		cfg:      cfg,
@@ -89,6 +92,7 @@ func main() {
 		order:    orderHandler,
 		checkout: checkoutHandler,
 		admin:    adminHandler,
+		search:   searchHandler,
 	})
 
 	srv := &http.Server{

@@ -19,6 +19,7 @@ import (
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/config"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/metrics"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/web"
+	"github.com/Nanako1900/NanoCrate/backend/internal/search"
 )
 
 // apiDeps bundles everything the router wires together.
@@ -33,6 +34,7 @@ type apiDeps struct {
 	order    *order.Handler
 	checkout *checkout.Handler
 	admin    *admin.Handler
+	search   *search.Handler
 }
 
 // newRouter wires middleware, probes, metrics, and the public/session/user/admin
@@ -57,8 +59,9 @@ func newRouter(d apiDeps) *gin.Engine {
 
 	v1 := r.Group("/api/v1")
 
-	// Public: catalog + Stripe webhook (signature-authenticated).
+	// Public: catalog + hybrid search + Stripe webhook (signature-authenticated).
 	d.catalog.Register(v1)
+	d.search.Register(v1)
 	d.checkout.RegisterWebhook(v1)
 
 	// Session: cart works for guests (cookie) or logged-in users (JWT).

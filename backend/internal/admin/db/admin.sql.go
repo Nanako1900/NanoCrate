@@ -603,3 +603,40 @@ func (q *Queries) GetProductTypeByKey(ctx context.Context, key string) (GetProdu
 	)
 	return i, err
 }
+
+const listProductsForIndex = `-- name: ListProductsForIndex :many
+SELECT id, name, description, attributes FROM products WHERE status = 'active' ORDER BY created_at
+`
+
+type ListProductsForIndexRow struct {
+	ID          uuid.UUID       `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Attributes  json.RawMessage `json:"attributes"`
+}
+
+// 搜索 backfill:取所有 active 商品的可索引文本来源。
+func (q *Queries) ListProductsForIndex(ctx context.Context) ([]ListProductsForIndexRow, error) {
+	rows, err := q.db.Query(ctx, listProductsForIndex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProductsForIndexRow
+	for rows.Next() {
+		var i ListProductsForIndexRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Attributes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
