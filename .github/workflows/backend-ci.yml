@@ -30,7 +30,9 @@ jobs:
 
       - name: Install dev tools (sqlc, staticcheck)
         run: |
-          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          # Pin sqlc to the version the committed generated code was produced with,
+          # so the diff-clean check is stable across sqlc releases.
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
           go install honnef.co/go/tools/cmd/staticcheck@latest
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
