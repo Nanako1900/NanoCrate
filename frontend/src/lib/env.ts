@@ -13,3 +13,13 @@ export const isMockMode = apiMode === 'mock';
 export const apiBaseUrl: string = isMockMode
   ? '/api/v1'
   : (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1');
+
+/** Keycloak OIDC config (live mode). Mock mode uses an in-memory dev session. */
+export const keycloakConfig = {
+  url: import.meta.env.VITE_KEYCLOAK_URL ?? '',
+  realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'nanocrate',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'storefront',
+};
+
+/** Stripe publishable key (live mode). Empty in mock mode → MockPaymentPanel. */
+export const stripePublishableKey: string = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '';
