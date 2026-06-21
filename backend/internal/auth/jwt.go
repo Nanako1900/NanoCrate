@@ -80,6 +80,18 @@ func (v *Verifier) RequireUser() gin.HandlerFunc {
 	}
 }
 
+// OptionalUser injects the Principal when a valid token is present, but never
+// rejects: anonymous (e.g. guest cart) requests proceed without a principal.
+func (v *Verifier) OptionalUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if principal, err := v.authenticate(c.Request); err == nil {
+			ctx := context.WithValue(c.Request.Context(), principalCtxKey{}, principal)
+			c.Request = c.Request.WithContext(ctx)
+		}
+		c.Next()
+	}
+}
+
 // RequireRole is middleware that enforces a realm role. It must run after RequireUser.
 func (v *Verifier) RequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
