@@ -23,8 +23,10 @@ INSERT INTO consumed_events (consumer, event_id) VALUES ($1, $2)
 ON CONFLICT (consumer, event_id) DO NOTHING;
 
 -- name: InsertDeadLetter :exec
+-- 幂等:崩溃重投后重复写入同一 (consumer,event_id) 不产生重复 DLQ 行。
 INSERT INTO dead_letters (consumer, event_id, subject, event_type, payload, error, attempts)
-VALUES ($1, $2, $3, $4, $5, $6, $7);
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (consumer, event_id) DO NOTHING;
 
 -- name: CountDeadLetters :one
 SELECT COUNT(*)::bigint FROM dead_letters;

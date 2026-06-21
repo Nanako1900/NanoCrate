@@ -96,11 +96,13 @@ func NewConsumer(name string, pool *pgxpool.Pool, process ProcessFunc, opts ...C
 // Handle processes one event idempotently. Returning nil acks the message;
 // returning an error asks the bus to redeliver (used only for infra failures).
 func (c *Consumer) Handle(ctx context.Context, e Event) error {
+	var spanErr error
 	ctx, end := startSpanFn(ctx, e.TraceParent, "consume "+e.Subject)
-	defer end()
+	defer func() { end(spanErr) }()
 
 	consumed, err := c.q.IsEventConsumed(ctx, eventsdb.IsEventConsumedParams{Consumer: c.name, EventID: e.ID})
 	if err != nil {
+		spanErr = err
 		return fmt.Errorf("dedup check %s/%s: %w", c.name, e.ID, err) // infra → redeliver
 	}
 	if consumed {
@@ -120,6 +122,7 @@ func (c *Consumer) Handle(ctx context.Context, e Event) error {
 		if attempt < c.maxAttempts && c.backoff > 0 {
 			select {
 			case <-ctx.Done():
+				spanErr = ctx.Err()
 				return ctx.Err()
 			case <-time.After(c.backoff * time.Duration(attempt)):
 			}
@@ -127,9 +130,15 @@ func (c *Consumer) Handle(ctx context.Context, e Event) error {
 	}
 
 	if perr != nil {
-		return c.deadLetter(ctx, e, perr)
+		spanErr = perr // record the business failure on the span even though we ack
+		if dlErr := c.deadLetter(ctx, e, perr); dlErr != nil {
+			spanErr = dlErr
+			return dlErr
+		}
+		return nil
 	}
 	if err := c.markConsumed(ctx, e); err != nil {
+		spanErr = err
 		return err
 	}
 	c.metrics.IncEventConsumed(c.name, e.Type)

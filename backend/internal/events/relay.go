@@ -49,7 +49,7 @@ func (r *Relay) PublishPending(ctx context.Context) (int, error) {
 		}
 		pubCtx, end := startSpanFn(ctx, e.TraceParent, "relay.publish "+e.Subject)
 		err := r.bus.Publish(pubCtx, e)
-		end()
+		end(err)
 		if err != nil {
 			return published, fmt.Errorf("publish outbox %d: %w", row.ID, err)
 		}

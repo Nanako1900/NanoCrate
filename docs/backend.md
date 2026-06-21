@@ -275,15 +275,16 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
 
 ```jsonc
 // GET /api/v1/admin/product-types/keyboard
+// (matches the seeded data exactly — migration 0007; the frontend builds the
+//  dynamic form from this live response, not from hard-coded fields.)
 { "success": true, "data": {
-    "key": "keyboard", "name": "Keyboard",
+    "key": "keyboard", "name": "Mechanical Keyboard",
     "attribute_schema": { "fields": [
-      { "name": "layout",        "type": "select", "required": true,  "options": ["60%","75%","TKL","full"] },
-      { "name": "hot_swappable", "type": "bool",   "required": false },
-      { "name": "switches",      "type": "number", "required": false },
-      { "name": "notes",         "type": "text",   "required": false }
+      { "name": "layout",        "type": "select", "required": true,  "options": ["60%","65%","75%","tkl","full"] },
+      { "name": "hot_swappable", "type": "bool",   "required": false }
     ] } } }
-// type ∈ text | number | bool | select;select 必带 options;required 缺省 false。
+// Field "type" ∈ text | number | bool | select;select 必带 options;required 缺省 false。
+// (其它 type 示例:{ "name":"weight_g","type":"number" } / { "name":"notes","type":"text" }。)
 ```
 
 **商品列表 / 写入:**
@@ -309,8 +310,8 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
 // 动态校验失败:
 { "success": false, "data": null, "error": { "code": "validation_failed",
     "message": "attribute validation failed",
-    "details": [ { "field": "layout", "message": "must be one of [60% 75% TKL full]" },
-                 { "field": "switches", "message": "must be a number" } ] } }   // 422
+    "details": [ { "field": "layout", "message": "must be one of [60% 65% 75% tkl full]" },
+                 { "field": "unknown_attr", "message": "unknown attribute" } ] } }   // 422
 ```
 
 **规格(variant)写入:**

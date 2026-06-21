@@ -27,6 +27,7 @@ func (q *Queries) CountDeadLetters(ctx context.Context) (int64, error) {
 const insertDeadLetter = `-- name: InsertDeadLetter :exec
 INSERT INTO dead_letters (consumer, event_id, subject, event_type, payload, error, attempts)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (consumer, event_id) DO NOTHING
 `
 
 type InsertDeadLetterParams struct {
@@ -39,6 +40,7 @@ type InsertDeadLetterParams struct {
 	Attempts  int32           `json:"attempts"`
 }
 
+// 幂等:崩溃重投后重复写入同一 (consumer,event_id) 不产生重复 DLQ 行。
 func (q *Queries) InsertDeadLetter(ctx context.Context, arg InsertDeadLetterParams) error {
 	_, err := q.db.Exec(ctx, insertDeadLetter,
 		arg.Consumer,
