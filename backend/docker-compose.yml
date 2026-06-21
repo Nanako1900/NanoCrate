@@ -1,0 +1,46 @@
+# NanoCrate 本地开发依赖(docs/backend.md §4/§5)。
+# 放在 backend/ 根,使 `cd backend && docker compose up -d` 无需 -f 即可起。
+name: nanocrate
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nanocrate-postgres
+    environment:
+      POSTGRES_USER: nano
+      POSTGRES_PASSWORD: nano
+      POSTGRES_DB: nanocrate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nano -d nanocrate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: nanocrate-keycloak
+    command: ["start-dev", "--http-port=8081"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nats:
+    image: nats:2.10
+    container_name: nanocrate-nats
+    command: ["-js", "-m", "8222"]   # JetStream + 监控端口(本阶段起起来即可,不深接)
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+volumes:
+  pgdata:

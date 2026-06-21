@@ -1,0 +1,8 @@
+# 本地环境与构建产物
+.env
+bin/
+coverage.out
+*.out
+
+# 编辑器/系统
+.DS_Store

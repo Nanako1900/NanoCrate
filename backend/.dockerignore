@@ -1,0 +1,13 @@
+# 构建镜像时排除(Phase 1 暂无 Dockerfile,先就位)
+.env
+.env.*
+!.env.example
+bin/
+coverage.out
+*.out
+.git
+.gitignore
+.DS_Store
+**/*_test.go
+README.md
+docker-compose.yml
