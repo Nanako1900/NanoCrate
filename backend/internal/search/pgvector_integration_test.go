@@ -105,6 +105,33 @@ func TestIntegration_HybridSearch_FuzzyDescriptionFindsKeyboard(t *testing.T) {
 	}
 }
 
+// The keyword candidate pool must be the true top-K by ts_rank (the CTE carries a
+// statement-level ORDER BY before LIMIT). With candidateK=1, only the strongest
+// keyword match enters the pool, so it must surface — deterministically.
+func TestIntegration_Search_KeywordCandidatePoolIsTopRanked(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	clearProducts(t, pool)
+
+	strong := seedProduct(t, pool, "kw-strong", "Keyboard Keyboard", "mechanical keyboard keyboard keyboard for keyboard fans")
+	weak1 := seedProduct(t, pool, "kw-weak1", "Desk Mat", "a desk mat that happens to mention keyboard once")
+	weak2 := seedProduct(t, pool, "kw-weak2", "USB Cable", "usb cable compatible with a keyboard")
+	sp := search.NewPgVector(pool, search.NewStubEmbedder(), search.WithCandidateK(1))
+	indexAll(t, sp, map[uuid.UUID]string{
+		strong: "Keyboard Keyboard mechanical keyboard keyboard keyboard",
+		weak1:  "Desk Mat keyboard once",
+		weak2:  "USB Cable keyboard",
+	})
+
+	hits, err := sp.Search(ctx, "keyboard", 5)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(hits) == 0 || hits[0].Slug != "kw-strong" {
+		t.Errorf("top hit = %v, want kw-strong (strongest keyword match in a size-1 pool)", slugs(hits))
+	}
+}
+
 func TestIntegration_Search_KeywordRecallAndArchivedExcluded(t *testing.T) {
 	pool := testutil.StartPostgres(t)
 	ctx := context.Background()

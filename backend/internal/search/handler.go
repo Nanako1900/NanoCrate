@@ -20,6 +20,14 @@ func NewHandler(provider Provider) *Handler {
 	return &Handler{provider: provider}
 }
 
+// Bounds for the unauthenticated search endpoint (defense against abuse /
+// third-party embedding-cost amplification). Per-IP rate limiting is expected at
+// the ingress/gateway in production.
+const (
+	maxSearchBody = 4 << 10 // 4 KiB request body
+	maxQueryLen   = 512     // characters
+)
+
 // Register mounts POST /search on a public group.
 func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/search", h.search)
@@ -31,16 +39,22 @@ type searchBody struct {
 }
 
 func (h *Handler) search(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSearchBody)
 	var body searchBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "invalid request body")
 		return
 	}
-	if strings.TrimSpace(body.Query) == "" {
+	query := strings.TrimSpace(body.Query)
+	if query == "" {
 		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "query is required")
 		return
 	}
-	hits, err := h.provider.Search(c.Request.Context(), body.Query, body.Limit)
+	if len(query) > maxQueryLen {
+		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "query too long")
+		return
+	}
+	hits, err := h.provider.Search(c.Request.Context(), query, body.Limit)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "search failed",
 			"error", err, "request_id", web.RequestIDFromContext(c.Request.Context()))

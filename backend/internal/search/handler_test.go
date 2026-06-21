@@ -64,6 +64,14 @@ func TestHandler_Search_EmptyQueryRejected(t *testing.T) {
 	}
 }
 
+func TestHandler_Search_RejectsTooLongQuery(t *testing.T) {
+	r := searchRouter(fakeProvider{})
+	code, _ := post(t, r, `{"query":"`+strings.Repeat("a", maxQueryLen+1)+`"}`)
+	if code != http.StatusBadRequest {
+		t.Errorf("over-length query = %d, want 400", code)
+	}
+}
+
 func TestHandler_Search_EmptyResultsIsEmptyArray(t *testing.T) {
 	r := searchRouter(fakeProvider{hits: []Hit{}})
 	_, body := post(t, r, `{"query":"nothing matches"}`)

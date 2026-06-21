@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	defaultLimit = 10
-	maxLimit     = 50
-	candidateK   = 50 // per-leg candidate pool before fusion
-	rrfK         = 60 // Reciprocal Rank Fusion constant (standard default)
+	defaultLimit      = 10
+	maxLimit          = 50
+	defaultCandidateK = 200 // per-leg candidate pool before fusion (decoupled from maxLimit)
+	rrfK              = 60  // Reciprocal Rank Fusion constant (standard default)
 )
 
 // PgVector is the default SearchProvider: pgvector cosine kNN for the semantic leg
@@ -21,13 +21,30 @@ const (
 // Rank Fusion. Vectors cross the pgx boundary as text with an explicit ::vector
 // cast (parameterized — pgvector-go v0.4.0 ships no pgx-v5 codec).
 type PgVector struct {
-	pool     *pgxpool.Pool
-	embedder Embedder
+	pool       *pgxpool.Pool
+	embedder   Embedder
+	candidateK int
+}
+
+// Option customizes the pgvector provider.
+type Option func(*PgVector)
+
+// WithCandidateK overrides the per-leg candidate pool size (values <= 0 ignored).
+func WithCandidateK(n int) Option {
+	return func(p *PgVector) {
+		if n > 0 {
+			p.candidateK = n
+		}
+	}
 }
 
 // NewPgVector builds the pgvector search provider.
-func NewPgVector(pool *pgxpool.Pool, embedder Embedder) *PgVector {
-	return &PgVector{pool: pool, embedder: embedder}
+func NewPgVector(pool *pgxpool.Pool, embedder Embedder, opts ...Option) *PgVector {
+	p := &PgVector{pool: pool, embedder: embedder, candidateK: defaultCandidateK}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 // Index computes and stores the product's embedding (the tsvector column is a
@@ -37,8 +54,10 @@ func (p *PgVector) Index(ctx context.Context, doc Document) error {
 	if err != nil {
 		return fmt.Errorf("embed product %s: %w", doc.ProductID, err)
 	}
+	// Only the embedding is touched — not products.updated_at, which is a business
+	// audit column and must not be churned by (re)indexing/backfill.
 	if _, err := p.pool.Exec(ctx,
-		`UPDATE products SET embedding = $1::vector, updated_at = now() WHERE id = $2`,
+		`UPDATE products SET embedding = $1::vector WHERE id = $2`,
 		pgvector.NewVector(vec).String(), doc.ProductID,
 	); err != nil {
 		return fmt.Errorf("write embedding for %s: %w", doc.ProductID, err)
@@ -69,10 +88,10 @@ func (p *PgVector) Search(ctx context.Context, query string, limit int) ([]Hit, 
 func (p *PgVector) hybrid(ctx context.Context, vecStr, query string, limit int) ([]Hit, error) {
 	const sql = `
 WITH semantic AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> $1::vector) AS rnk
+    SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> $1::vector, id) AS rnk
     FROM products
     WHERE status = 'active' AND embedding IS NOT NULL
-    ORDER BY embedding <=> $1::vector
+    ORDER BY embedding <=> $1::vector, id
     LIMIT $3
 ),
 keyword AS (
@@ -81,6 +100,7 @@ keyword AS (
     ) AS rnk
     FROM products
     WHERE status = 'active' AND search_tsv @@ plainto_tsquery('english', $2)
+    ORDER BY ts_rank(search_tsv, plainto_tsquery('english', $2)) DESC, id
     LIMIT $3
 ),
 fused AS (
@@ -96,7 +116,7 @@ JOIN products p ON p.id = f.id
 JOIN product_types pt ON pt.id = p.product_type_id
 ORDER BY f.score DESC, p.slug
 LIMIT $5`
-	rows, err := p.pool.Query(ctx, sql, vecStr, query, candidateK, rrfK, limit)
+	rows, err := p.pool.Query(ctx, sql, vecStr, query, p.candidateK, rrfK, limit)
 	if err != nil {
 		return nil, fmt.Errorf("hybrid search: %w", err)
 	}
