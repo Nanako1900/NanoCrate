@@ -1,0 +1,20 @@
+# Runs migrations to completion before the API/worker roll out. Re-runnable
+# (golang-migrate is idempotent on an up-to-date DB).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nanocrate-migrate
+  namespace: nanocrate
+spec:
+  backoffLimit: 6
+  template:
+    metadata: { labels: { app: nanocrate-migrate } }
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: nanocrate-backend:latest
+          command: ["/app/migrate", "-path", "/migrations", "-database", "$(DATABASE_URL)", "up"]
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: nanocrate-secrets, key: DATABASE_URL } }

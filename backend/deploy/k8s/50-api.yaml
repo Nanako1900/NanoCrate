@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanocrate-api
+  namespace: nanocrate
+spec:
+  selector: { app: nanocrate-api }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanocrate-api
+  namespace: nanocrate
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: nanocrate-api } }
+  template:
+    metadata: { labels: { app: nanocrate-api } }
+    spec:
+      containers:
+        - name: api
+          image: nanocrate-backend:latest
+          command: ["/app/api"]
+          ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: nanocrate-config }
+            - secretRef: { name: nanocrate-secrets }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "1", memory: "512Mi" }

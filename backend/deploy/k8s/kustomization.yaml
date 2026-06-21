@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nanocrate
+resources:
+  - 00-namespace.yaml
+  - 10-config.yaml
+  - 20-postgres.yaml
+  - 21-nats.yaml
+  - 22-keycloak.yaml
+  - 30-observability.yaml
+  - 40-migrate-job.yaml
+  - 50-api.yaml
+  - 51-worker.yaml
+images:
+  - name: nanocrate-backend
+    newName: nanocrate-backend
+    newTag: latest
