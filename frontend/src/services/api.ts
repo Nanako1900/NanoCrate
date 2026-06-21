@@ -38,12 +38,20 @@ import {
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly status: number | null;
+  /** §9.5 validation_failed: per-field messages, when present. */
+  readonly details: { field: string; message: string }[];
 
-  constructor(code: ApiErrorCode, message: string, status: number | null = null) {
+  constructor(
+    code: ApiErrorCode,
+    message: string,
+    status: number | null = null,
+    details: { field: string; message: string }[] = [],
+  ) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -128,7 +136,7 @@ export async function request<T>(path: string, options: RequestOptions<T>): Prom
   if (!success || !response.ok) {
     const code: ApiErrorCode = error?.code ?? 'internal';
     const message = error?.message ?? `Request failed (HTTP ${response.status}).`;
-    throw new ApiError(code, message, response.status);
+    throw new ApiError(code, message, response.status, error?.details ?? []);
   }
 
   const parsed = schema.safeParse(data);

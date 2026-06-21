@@ -80,7 +80,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
               <li key={o.id}>
                 <Link to={`/admin/orders/${o.id}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-sunken">
                   <span className="label-mono normal-case text-ink">{o.id}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink-soft">{o.customer_email}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-2xs text-ink-soft">{o.user_id}</span>
                   <OrderStatusBadge status={o.status} />
                   <span className="font-mono text-sm tabular-nums text-ink">{formatPrice(o.total_cents, o.currency)}</span>
                 </Link>

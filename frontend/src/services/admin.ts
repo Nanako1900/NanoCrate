@@ -6,27 +6,30 @@ import {
   adminProductDetailSchema,
   adminProductListSchema,
   adminProductTypeSchema,
+  adminVariantSchema,
   dashboardSchema,
   inventoryListSchema,
-  inventoryRowSchema,
+  restockResultSchema,
   stockLedgerSchema,
   type AdminOrderDetail,
   type AdminOrderSummary,
   type AdminProductDetail,
   type AdminProductListItem,
   type AdminProductType,
+  type AdminVariant,
   type DashboardData,
   type InventoryRow,
   type ProductWriteInput,
+  type RestockResult,
   type StockLedgerEntry,
   type VariantWriteInput,
 } from './admin-types';
 import type { PaginationMeta } from './types';
 
 /**
- * Admin API client (PROPOSED §9.5). Every call goes through the shared `request`
- * (envelope unwrap + Zod validation + auth header). All endpoints require the
- * admin role server-side; the client also gates the routes (RBAC, AdminRoute).
+ * Admin API client — aligned to backend.md §9.5. Every call goes through the
+ * shared `request` (envelope + Zod + auth header). All endpoints require the
+ * admin role server-side (and the UI gates the routes via AdminRoute).
  */
 
 export interface AdminProductListResult {
@@ -37,8 +40,20 @@ export interface AdminOrderListResult {
   orders: AdminOrderSummary[];
   meta: PaginationMeta;
 }
+export interface InventoryListResult {
+  rows: InventoryRow[];
+  meta: PaginationMeta;
+}
+export interface StockLedgerResult {
+  entries: StockLedgerEntry[];
+  meta: PaginationMeta;
+}
 
-/* ---- Dashboard ---- */
+function metaOr(meta: PaginationMeta | null, total: number, page = 1, limit = total): PaginationMeta {
+  return meta ?? { total, page, limit };
+}
+
+/* ---- Dashboard (frontend-only — NOT in §9.5; mock aggregates §9.5 data) ---- */
 export async function getDashboard(signal?: AbortSignal): Promise<DashboardData> {
   const { data } = await request('/admin/dashboard', { schema: dashboardSchema, auth: true, signal });
   return data;
@@ -64,6 +79,8 @@ export async function getAdminProductType(key: string, signal?: AbortSignal): Pr
 }
 
 /* ---- Products ---- */
+// §9.5 supports q/status/page/limit; `type`/`sort` are client conveniences the
+// mock honors (a live backend may ignore them).
 export interface AdminProductQuery {
   q?: string;
   type?: string;
@@ -90,10 +107,11 @@ export async function getAdminProducts(
     auth: true,
     signal,
   });
-  const fallback: PaginationMeta = { total: data.length, page: query.page ?? 1, limit: query.limit ?? data.length };
-  return { items: data, meta: meta ?? fallback };
+  return { items: data, meta: metaOr(meta, data.length, query.page ?? 1, query.limit ?? data.length) };
 }
 
+// NOTE: GET /admin/products/:id (detail + variants) is not yet specified in §9.5
+// — flagged for backend. The mock returns the product with its variants joined.
 export async function getAdminProduct(id: string, signal?: AbortSignal): Promise<AdminProductDetail> {
   const { data } = await request(`/admin/products/${encodeURIComponent(id)}`, {
     schema: adminProductDetailSchema,
@@ -132,54 +150,72 @@ export async function archiveProduct(id: string): Promise<AdminProductDetail> {
   return data;
 }
 
-/* ---- Variants ---- */
-export async function createVariant(productId: string, input: VariantWriteInput): Promise<AdminProductDetail> {
+/* ---- Variants (§9.5 write endpoints return the variant) ---- */
+export async function createVariant(productId: string, input: VariantWriteInput): Promise<AdminVariant> {
   const { data } = await request(`/admin/products/${encodeURIComponent(productId)}/variants`, {
     method: 'POST',
     body: input,
-    schema: adminProductDetailSchema,
+    schema: adminVariantSchema,
     auth: true,
   });
   return data;
 }
 
-export async function updateVariant(
-  variantId: string,
-  input: Partial<VariantWriteInput>,
-): Promise<AdminProductDetail> {
+export async function updateVariant(variantId: string, input: Partial<VariantWriteInput>): Promise<AdminVariant> {
   const { data } = await request(`/admin/variants/${encodeURIComponent(variantId)}`, {
     method: 'PATCH',
     body: input,
-    schema: adminProductDetailSchema,
+    schema: adminVariantSchema,
     auth: true,
   });
   return data;
 }
 
 /* ---- Inventory + ledger ---- */
-export async function getInventory(lowOnly = false, signal?: AbortSignal): Promise<InventoryRow[]> {
-  const { data } = await request(`/admin/inventory${lowOnly ? '?low=1' : ''}`, {
+export interface InventoryQuery {
+  low?: boolean;
+  threshold?: number;
+  page?: number;
+  limit?: number;
+}
+
+export async function getInventory(query: InventoryQuery = {}, signal?: AbortSignal): Promise<InventoryListResult> {
+  const search = new URLSearchParams();
+  if (query.low) search.set('low', 'true');
+  if (query.threshold !== undefined) search.set('threshold', String(query.threshold));
+  if (query.page) search.set('page', String(query.page));
+  if (query.limit) search.set('limit', String(query.limit));
+  const qs = search.toString();
+  const { data, meta } = await request(`/admin/inventory${qs ? `?${qs}` : ''}`, {
     schema: inventoryListSchema,
     auth: true,
     signal,
   });
-  return data;
+  return { rows: data, meta: metaOr(meta, data.length, query.page ?? 1, query.limit ?? data.length) };
 }
 
-export async function getStockLedger(variantId: string, signal?: AbortSignal): Promise<StockLedgerEntry[]> {
-  const { data } = await request(`/admin/inventory/${encodeURIComponent(variantId)}/ledger`, {
+export async function getStockLedger(
+  variantId: string,
+  query: { page?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<StockLedgerResult> {
+  const search = new URLSearchParams();
+  if (query.page) search.set('page', String(query.page));
+  if (query.limit) search.set('limit', String(query.limit));
+  const qs = search.toString();
+  const { data, meta } = await request(`/admin/inventory/${encodeURIComponent(variantId)}/ledger${qs ? `?${qs}` : ''}`, {
     schema: stockLedgerSchema,
     auth: true,
     signal,
   });
-  return data;
+  return { entries: data, meta: metaOr(meta, data.length, query.page ?? 1, query.limit ?? data.length) };
 }
 
-export async function restock(variantId: string, qty: number): Promise<InventoryRow> {
+export async function restock(variantId: string, qty: number): Promise<RestockResult> {
   const { data } = await request(`/admin/inventory/${encodeURIComponent(variantId)}/restock`, {
     method: 'POST',
     body: { qty },
-    schema: inventoryRowSchema,
+    schema: restockResultSchema,
     auth: true,
   });
   return data;
@@ -200,8 +236,7 @@ export async function getAdminOrders(
     auth: true,
     signal,
   });
-  const fallback: PaginationMeta = { total: data.length, page: query.page ?? 1, limit: query.limit ?? data.length };
-  return { orders: data, meta: meta ?? fallback };
+  return { orders: data, meta: metaOr(meta, data.length, query.page ?? 1, query.limit ?? data.length) };
 }
 
 export async function getAdminOrder(id: string, signal?: AbortSignal): Promise<AdminOrderDetail> {

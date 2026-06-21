@@ -1,18 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getInventory, getStockLedger, restock } from '@/services/admin';
+import { getInventory, getStockLedger, restock, type InventoryQuery } from '@/services/admin';
 import { adminKeys } from './keys';
 
-export function useInventory(lowOnly = false) {
+export function useInventory(query: InventoryQuery = {}) {
   return useQuery({
-    queryKey: adminKeys.inventory(lowOnly),
-    queryFn: ({ signal }) => getInventory(lowOnly, signal),
+    queryKey: adminKeys.inventory(query),
+    queryFn: ({ signal }) => getInventory(query, signal),
   });
 }
 
 export function useStockLedger(variantId: string) {
   return useQuery({
     queryKey: adminKeys.ledger(variantId),
-    queryFn: ({ signal }) => getStockLedger(variantId, signal),
+    queryFn: ({ signal }) => getStockLedger(variantId, {}, signal),
     enabled: Boolean(variantId),
   });
 }

@@ -10,6 +10,12 @@ export function attributeFieldId(name: string): string {
   return `attr-${name}`;
 }
 
+/** §9.5 fields may omit `label`; derive a readable one from the attribute name. */
+function fieldLabel(field: AttributeField): string {
+  if (field.label) return field.label;
+  return field.name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 interface DynamicAttributeFormProps {
   schema: AttributeSchema;
   values: AttributeFormValues;
@@ -94,7 +100,7 @@ export function DynamicAttributeForm({ schema, values, errors, onChange, disable
                 aria-describedby={field.help ? `${id}-help` : undefined}
                 label={
                   <>
-                    {field.label}
+                    {fieldLabel(field)}
                     {field.required && <span className="ml-1 text-stock-out-ink" aria-hidden="true">*</span>}
                   </>
                 }
@@ -111,7 +117,7 @@ export function DynamicAttributeForm({ schema, values, errors, onChange, disable
           <FormField
             key={field.name}
             htmlFor={id}
-            label={field.label}
+            label={fieldLabel(field)}
             required={field.required}
             help={field.help}
             error={errors[field.name]}

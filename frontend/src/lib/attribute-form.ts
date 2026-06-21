@@ -33,20 +33,21 @@ export function attributeValuesFrom(
 export function validateAttributeValues(schema: AttributeSchema, values: AttributeFormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const field of schema.fields) {
+    const label = field.label ?? field.name; // §9.5 fields may omit `label`
     const value = values[field.name];
     // A boolean is always "present" (true or false); only text/number/select
     // can be empty and thus fail a required check.
     const empty = field.type !== 'bool' && (value === '' || value === undefined || value === null);
     if (field.required && empty) {
-      errors[field.name] = `${field.label} is required.`;
+      errors[field.name] = `${label} is required.`;
       continue;
     }
     if (empty) continue;
     if (field.type === 'number' && !Number.isFinite(Number(value))) {
-      errors[field.name] = `${field.label} must be a number.`;
+      errors[field.name] = `${label} must be a number.`;
     }
     if (field.type === 'select' && field.options && !field.options.includes(String(value))) {
-      errors[field.name] = `Choose a valid ${field.label.toLowerCase()}.`;
+      errors[field.name] = `Choose a valid ${label.toLowerCase()}.`;
     }
   }
   return errors;

@@ -8,6 +8,7 @@ import type {
   InventoryRow,
   LedgerKind,
   ProductStatus,
+  RestockResult,
   StockLedgerEntry,
 } from '@/services/admin-types';
 import type { OrderStatus, PaymentStatus } from '@/services/types';
@@ -15,14 +16,14 @@ import { mockProducts } from '../fixtures/products';
 import { ADMIN_ATTRIBUTE_SCHEMAS } from './schemas';
 
 /**
- * In-memory admin backend (mock). Self-contained: seeds products/variants from
- * the storefront fixtures and maintains its own available/reserved inventory, an
- * append-only stock ledger (reserve/commit/release/restock — the concurrency
- * showcase), admin orders with customers + timelines, and a running
- * stock-conflict counter. Reset by __resetAdminStore for test isolation.
+ * In-memory admin backend (mock), emitting the §9.5 shapes. Seeds products /
+ * variants from the storefront fixtures and maintains available/reserved
+ * inventory + an append-only stock ledger (two signed deltas, the concurrency
+ * showcase), admin orders keyed by user_id, and a stock-conflict counter for the
+ * (frontend-only) dashboard. __resetAdminStore restores the seed.
  */
 
-const LOW_STOCK_THRESHOLD = 5;
+const DEFAULT_THRESHOLD = 5;
 const CURRENCY = 'USD';
 
 interface ProductRecord {
@@ -34,8 +35,6 @@ interface ProductRecord {
   status: ProductStatus;
   attributes: Record<string, string | number | boolean>;
   variantIds: string[];
-  createdAt: string;
-  updatedAt: string;
 }
 
 interface VariantRecord {
@@ -44,27 +43,36 @@ interface VariantRecord {
   sku: string;
   name: string;
   price_cents: number;
+  status: ProductStatus;
   attributes: Record<string, string | number | boolean>;
   available: number;
   reserved: number;
-  lowThreshold: number;
+}
+
+interface LedgerRecord {
+  id: number;
+  variantId: string;
+  kind: LedgerKind;
+  delta_available: number;
+  delta_reserved: number;
+  reservation_id: string | null;
+  created_at: string;
 }
 
 interface OrderRecord {
   id: string;
+  userId: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  customer: { name: string; email: string };
   items: { sku: string; name: string; unit_price_cents: number; qty: number; line_total_cents: number }[];
   subtotal_cents: number;
   total_cents: number;
-  timeline: { status: string; at: string; note: string | null }[];
   createdAt: string;
 }
 
 let products = new Map<string, ProductRecord>();
 let variants = new Map<string, VariantRecord>();
-let ledger: StockLedgerEntry[] = [];
+let ledger: LedgerRecord[] = [];
 let orders = new Map<string, OrderRecord>();
 let stockConflicts = 0;
 let seq = { product: 0, variant: 0, ledger: 0, order: 0 };
@@ -76,23 +84,21 @@ const ISO = (offsetDays: number, hour = 10): string => {
   return d.toISOString();
 };
 
-const CUSTOMERS = [
-  { name: 'Mara Okonkwo', email: 'mara@example.com' },
-  { name: 'Devin Park', email: 'devin@example.com' },
-  { name: 'Lena Fischer', email: 'lena@example.com' },
-  { name: 'Sora Tanaka', email: 'sora@example.com' },
-  { name: 'Ravi Mehta', email: 'ravi@example.com' },
-];
-
-function pushLedger(variantId: string, kind: LedgerKind, delta: number, availableAfter: number, orderId: string | null, note: string | null, at: string): void {
+function pushLedger(
+  variantId: string,
+  kind: LedgerKind,
+  deltaAvailable: number,
+  deltaReserved: number,
+  reservationId: string | null,
+  at: string,
+): void {
   ledger.push({
-    id: `sl_${String((seq.ledger += 1)).padStart(3, '0')}`,
-    variant_id: variantId,
+    id: (seq.ledger += 1),
+    variantId,
     kind,
-    delta,
-    available_after: availableAfter,
-    order_id: orderId,
-    note,
+    delta_available: deltaAvailable,
+    delta_reserved: deltaReserved,
+    reservation_id: reservationId,
     created_at: at,
   });
 }
@@ -102,14 +108,14 @@ function seed(): void {
   variants = new Map();
   ledger = [];
   orders = new Map();
-  stockConflicts = 3; // seeded oversell attempts the saga rejected
+  stockConflicts = 3;
   seq = { product: 0, variant: 0, ledger: 0, order: 0 };
 
   mockProducts.forEach((product, pIndex) => {
     const productId = `p_${String((seq.product += 1)).padStart(2, '0')}`;
     const variantIds: string[] = [];
     product.variants.forEach((v, vIndex) => {
-      const variantId = `vr_${String((seq.variant += 1)).padStart(2, '0')}`;
+      const variantId = `v_${String((seq.variant += 1)).padStart(2, '0')}`;
       const reserved = v.available > 0 ? (vIndex + pIndex) % 4 : 0;
       variants.set(variantId, {
         id: variantId,
@@ -117,16 +123,14 @@ function seed(): void {
         sku: v.sku,
         name: v.name,
         price_cents: v.price_cents,
+        status: 'active',
         attributes: v.attributes,
         available: v.available,
         reserved,
-        lowThreshold: LOW_STOCK_THRESHOLD,
       });
       variantIds.push(variantId);
-      // Seed an initial restock + (when reserved) a reservation, so the ledger
-      // reads as a believable audit trail.
-      pushLedger(variantId, 'restock', v.available + reserved, v.available + reserved, null, 'Initial stock', ISO(20, 9));
-      if (reserved > 0) pushLedger(variantId, 'reserve', -reserved, v.available, `o_${vIndex}${pIndex}`, 'Checkout reservation', ISO(2, 11 + (vIndex % 6)));
+      pushLedger(variantId, 'restock', v.available + reserved, 0, null, ISO(20, 9));
+      if (reserved > 0) pushLedger(variantId, 'reserve', -reserved, reserved, `r_${String(seq.ledger).padStart(2, '0')}`, ISO(2, 11 + (vIndex % 6)));
     });
     products.set(productId, {
       id: productId,
@@ -137,12 +141,9 @@ function seed(): void {
       status: 'active',
       attributes: product.attributes,
       variantIds,
-      createdAt: product.createdAt,
-      updatedAt: product.createdAt,
     });
   });
 
-  // A handful of admin orders with customers + status timelines.
   const orderSeeds: { status: OrderStatus; payment: PaymentStatus; daysAgo: number; lines: [string, number][] }[] = [
     { status: 'paid', payment: 'succeeded', daysAgo: 0, lines: [['NANO75-RED-PBTW', 1], ['KC-BENTO-BASE', 1]] },
     { status: 'fulfilled', payment: 'succeeded', daysAgo: 1, lines: [['NANO60-RED-PBTW', 2]] },
@@ -164,41 +165,35 @@ function seed(): void {
       return [{ sku: v.sku, name: v.name, unit_price_cents: v.price_cents, qty, line_total_cents: v.price_cents * qty }];
     });
     const subtotal = items.reduce((s, it) => s + it.line_total_cents, 0);
-    const created = ISO(o.daysAgo, 9 + (i % 8));
-    const timeline: OrderRecord['timeline'] = [{ status: 'pending', at: created, note: 'Order created, stock reserved' }];
-    if (o.status !== 'pending') {
-      timeline.push({ status: o.payment === 'succeeded' ? 'paid' : o.status, at: created, note: o.payment === 'succeeded' ? 'Payment confirmed (webhook)' : 'Payment failed' });
-    }
-    if (o.status === 'fulfilled') timeline.push({ status: 'fulfilled', at: created, note: 'Shipped' });
-    if (o.status === 'cancelled') timeline.push({ status: 'cancelled', at: created, note: 'Stock unavailable at settlement — refunded' });
     orders.set(id, {
       id,
+      userId: `kc-sub-${100 + i}`,
       status: o.status,
       paymentStatus: o.payment,
-      customer: CUSTOMERS[i % CUSTOMERS.length],
       items,
       subtotal_cents: subtotal,
       total_cents: subtotal,
-      timeline,
-      createdAt: created,
+      createdAt: ISO(o.daysAgo, 9 + (i % 8)),
     });
   });
 }
 
 seed();
 
-/* ---- Projections ---- */
+/* ---- Projections (§9.5 shapes) ---- */
 
 function toAdminVariant(v: VariantRecord): AdminVariant {
   return {
     id: v.id,
+    product_id: v.productId,
     sku: v.sku,
     name: v.name,
     price_cents: v.price_cents,
     currency: CURRENCY,
+    status: v.status,
     attributes: v.attributes,
     available: v.available,
-    reserved: v.reserved,
+    reserved: v.reserved, // frontend-only (joined from inventory for the editor)
   };
 }
 
@@ -216,12 +211,8 @@ export function toListItem(record: ProductRecord): AdminProductListItem {
     type: record.type,
     status: record.status,
     variant_count: vs.length,
-    price_min_cents: prices.length ? Math.min(...prices) : 0,
-    price_max_cents: prices.length ? Math.max(...prices) : 0,
-    currency: CURRENCY,
+    price_range_cents: { min: prices.length ? Math.min(...prices) : 0, max: prices.length ? Math.max(...prices) : 0 },
     total_available: vs.reduce((s, v) => s + v.available, 0),
-    image: `/img/keyboards/${record.slug}.svg`,
-    updated_at: record.updatedAt,
   };
 }
 
@@ -235,8 +226,6 @@ export function toDetail(record: ProductRecord): AdminProductDetail {
     status: record.status,
     attributes: record.attributes,
     variants: productVariants(record).map(toAdminVariant),
-    created_at: record.createdAt,
-    updated_at: record.updatedAt,
   };
 }
 
@@ -246,52 +235,63 @@ export function toInventoryRow(v: VariantRecord): InventoryRow {
     variant_id: v.id,
     sku: v.sku,
     product_name: product?.name ?? '—',
-    variant_name: v.name,
     available: v.available,
     reserved: v.reserved,
-    on_hand: v.available + v.reserved,
-    low_stock_threshold: v.lowThreshold,
-    is_low: v.available <= v.lowThreshold,
+  };
+}
+
+function toLedgerEntry(r: LedgerRecord): StockLedgerEntry {
+  return {
+    id: r.id,
+    kind: r.kind,
+    delta_available: r.delta_available,
+    delta_reserved: r.delta_reserved,
+    reservation_id: r.reservation_id,
+    created_at: r.created_at,
   };
 }
 
 function toOrderSummary(o: OrderRecord): AdminOrderSummary {
   return {
     id: o.id,
+    user_id: o.userId,
     status: o.status,
     total_cents: o.total_cents,
     currency: CURRENCY,
     item_count: o.items.reduce((s, it) => s + it.qty, 0),
-    customer_email: o.customer.email,
     created_at: o.createdAt,
   };
 }
 
-/* ---- Validation (attributes against the type's attribute_schema) ---- */
-
+/* ---- Validation (attributes against the type's attribute_schema → §9.5 details[]) ---- */
 export interface ValidationFailure {
   field: string;
   message: string;
 }
 
-export function validateAttributes(typeKey: string, attributes: Record<string, unknown>): ValidationFailure | null {
+export function validateAttributes(typeKey: string, attributes: Record<string, unknown>): ValidationFailure[] {
   const schema = ADMIN_ATTRIBUTE_SCHEMAS[typeKey];
-  if (!schema) return { field: 'type', message: `Unknown product type "${typeKey}".` };
+  if (!schema) return [{ field: 'type', message: `unknown product type "${typeKey}"` }];
+  const failures: ValidationFailure[] = [];
+  const known = new Set(schema.fields.map((f) => f.name));
   for (const field of schema.fields) {
     const value = attributes[field.name];
     const missing = value === undefined || value === null || value === '';
-    if (field.required && missing) return { field: field.name, message: `${field.label} is required.` };
+    if (field.required && field.type !== 'bool' && missing) {
+      failures.push({ field: field.name, message: `${field.name} is required` });
+      continue;
+    }
     if (missing) continue;
-    if (field.type === 'number' && typeof value !== 'number') return { field: field.name, message: `${field.label} must be a number.` };
-    if (field.type === 'bool' && typeof value !== 'boolean') return { field: field.name, message: `${field.label} must be true or false.` };
+    if (field.type === 'number' && typeof value !== 'number') failures.push({ field: field.name, message: `${field.name} must be a number` });
+    if (field.type === 'bool' && typeof value !== 'boolean') failures.push({ field: field.name, message: `${field.name} must be a boolean` });
     if (field.type === 'select' && field.options && !field.options.includes(String(value)))
-      return { field: field.name, message: `${field.label} must be one of: ${field.options.join(', ')}.` };
+      failures.push({ field: field.name, message: `must be one of [${field.options.join(' ')}]` });
   }
-  return null;
+  for (const key of Object.keys(attributes)) if (!known.has(key)) failures.push({ field: key, message: 'unknown attribute' });
+  return failures;
 }
 
 /* ---- Queries ---- */
-
 export interface ProductQuery {
   q?: string;
   type?: string;
@@ -307,20 +307,18 @@ export function listProducts(query: ProductQuery): AdminProductListItem[] {
     const q = query.q.toLowerCase();
     items = items.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q));
   }
-  const [key, dir] = (query.sort ?? 'updated_at:desc').split(':');
-  const factor = dir === 'asc' ? 1 : -1;
+  const [key, dir] = (query.sort ?? 'name:asc').split(':');
+  const factor = dir === 'desc' ? -1 : 1;
   items.sort((a, b) => {
     switch (key) {
-      case 'name':
-        return a.name.localeCompare(b.name) * factor;
       case 'price':
-        return (a.price_min_cents - b.price_min_cents) * factor;
+        return (a.price_range_cents.min - b.price_range_cents.min) * factor;
       case 'stock':
         return (a.total_available - b.total_available) * factor;
       case 'status':
         return a.status.localeCompare(b.status) * factor;
       default:
-        return a.updated_at.localeCompare(b.updated_at) * factor;
+        return a.name.localeCompare(b.name) * factor;
     }
   });
   return items;
@@ -331,17 +329,18 @@ export function getProductDetail(id: string): AdminProductDetail | null {
   return record ? toDetail(record) : null;
 }
 
-export function listInventory(lowOnly: boolean): InventoryRow[] {
-  let rows = [...variants.values()].map(toInventoryRow);
-  if (lowOnly) rows = rows.filter((r) => r.is_low);
-  return rows.sort((a, b) => a.available - b.available);
+export function listInventory(low: boolean, threshold = DEFAULT_THRESHOLD): InventoryRow[] {
+  let rows = [...variants.values()];
+  if (low) rows = rows.filter((v) => v.available <= threshold);
+  return rows.sort((a, b) => a.available - b.available).map(toInventoryRow);
 }
 
 export function getLedger(variantId: string): StockLedgerEntry[] | null {
   if (!variants.has(variantId)) return null;
   return ledger
-    .filter((e) => e.variant_id === variantId)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    .filter((e) => e.variantId === variantId)
+    .sort((a, b) => b.id - a.id)
+    .map(toLedgerEntry);
 }
 
 export function listOrders(status?: string): AdminOrderSummary[] {
@@ -355,22 +354,20 @@ export function getOrderDetail(id: string): AdminOrderDetail | null {
   if (!o) return null;
   return {
     id: o.id,
+    user_id: o.userId,
     status: o.status,
     currency: CURRENCY,
     subtotal_cents: o.subtotal_cents,
     total_cents: o.total_cents,
-    customer: o.customer,
     payment: { provider: 'stripe', status: o.paymentStatus },
     items: o.items,
-    timeline: o.timeline,
     created_at: o.createdAt,
   };
 }
 
 /* ---- Mutations ---- */
-
-export function nextSlug(name: string): string {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'product';
+export function nextSlug(name: string, requested?: string): string {
+  const base = (requested || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'product';
   let slug = base;
   let n = 2;
   const taken = new Set([...products.values()].map((p) => p.slug));
@@ -380,6 +377,7 @@ export function nextSlug(name: string): string {
 
 export interface CreateProductInput {
   name: string;
+  slug?: string;
   type: string;
   description: string;
   status: ProductStatus;
@@ -388,18 +386,15 @@ export interface CreateProductInput {
 
 export function createProduct(input: CreateProductInput): AdminProductDetail {
   const id = `p_${String((seq.product += 1)).padStart(2, '0')}`;
-  const now = new Date().toISOString();
   products.set(id, {
     id,
-    slug: nextSlug(input.name),
+    slug: nextSlug(input.name, input.slug),
     name: input.name,
     description: input.description,
     type: input.type,
     status: input.status,
     attributes: input.attributes,
     variantIds: [],
-    createdAt: now,
-    updatedAt: now,
   });
   return toDetail(products.get(id)!);
 }
@@ -409,11 +404,11 @@ export function updateProduct(id: string, input: Partial<CreateProductInput>): A
   if (!record) return null;
   Object.assign(record, {
     name: input.name ?? record.name,
+    slug: input.slug ?? record.slug,
     description: input.description ?? record.description,
     type: input.type ?? record.type,
     status: input.status ?? record.status,
     attributes: input.attributes ?? record.attributes,
-    updatedAt: new Date().toISOString(),
   });
   return toDetail(record);
 }
@@ -422,7 +417,6 @@ export function archiveProduct(id: string): AdminProductDetail | null {
   const record = products.get(id);
   if (!record) return null;
   record.status = 'archived';
-  record.updatedAt = new Date().toISOString();
   return toDetail(record);
 }
 
@@ -430,6 +424,7 @@ export interface CreateVariantInput {
   sku: string;
   name: string;
   price_cents: number;
+  status?: ProductStatus;
   attributes: Record<string, string | number | boolean>;
   available: number;
 }
@@ -439,88 +434,73 @@ export function skuExists(sku: string, exceptVariantId?: string): boolean {
   return false;
 }
 
-export function createVariant(productId: string, input: CreateVariantInput): AdminProductDetail | null {
+export function createVariant(productId: string, input: CreateVariantInput): AdminVariant | null {
   const product = products.get(productId);
   if (!product) return null;
-  const id = `vr_${String((seq.variant += 1)).padStart(2, '0')}`;
+  const id = `v_${String((seq.variant += 1)).padStart(2, '0')}`;
   variants.set(id, {
     id,
     productId,
     sku: input.sku,
     name: input.name,
     price_cents: input.price_cents,
+    status: input.status ?? 'active',
     attributes: input.attributes,
     available: input.available,
     reserved: 0,
-    lowThreshold: LOW_STOCK_THRESHOLD,
   });
   product.variantIds.push(id);
-  product.updatedAt = new Date().toISOString();
-  if (input.available > 0) pushLedger(id, 'restock', input.available, input.available, null, 'Variant created', new Date().toISOString());
-  return toDetail(product);
+  if (input.available > 0) pushLedger(id, 'restock', input.available, 0, null, new Date().toISOString());
+  return toAdminVariant(variants.get(id)!);
 }
 
-export function updateVariant(variantId: string, input: Partial<CreateVariantInput>): AdminProductDetail | null {
+export function updateVariant(variantId: string, input: Partial<CreateVariantInput>): AdminVariant | null {
   const v = variants.get(variantId);
   if (!v) return null;
   if (input.sku !== undefined) v.sku = input.sku;
   if (input.name !== undefined) v.name = input.name;
   if (input.price_cents !== undefined) v.price_cents = input.price_cents;
+  if (input.status !== undefined) v.status = input.status;
   if (input.attributes !== undefined) v.attributes = input.attributes;
   if (input.available !== undefined && input.available !== v.available) {
     const delta = input.available - v.available;
     v.available = input.available;
-    pushLedger(variantId, delta >= 0 ? 'restock' : 'commit', delta, v.available, null, 'Manual adjustment', new Date().toISOString());
+    pushLedger(variantId, delta >= 0 ? 'restock' : 'commit', delta, 0, null, new Date().toISOString());
   }
-  const product = products.get(v.productId);
-  if (product) product.updatedAt = new Date().toISOString();
-  return product ? toDetail(product) : null;
+  return toAdminVariant(v);
 }
 
-export function restock(variantId: string, qty: number): InventoryRow | null {
+export function restock(variantId: string, qty: number): RestockResult | null {
   const v = variants.get(variantId);
   if (!v) return null;
   v.available += qty;
-  pushLedger(variantId, 'restock', qty, v.available, null, 'Manual restock', new Date().toISOString());
-  const product = products.get(v.productId);
-  if (product) product.updatedAt = new Date().toISOString();
-  return toInventoryRow(v);
+  pushLedger(variantId, 'restock', qty, 0, null, new Date().toISOString());
+  return { variant_id: v.id, available: v.available, reserved: v.reserved };
 }
 
 export function variantById(id: string): VariantRecord | undefined {
   return variants.get(id);
 }
 
-/* ---- Dashboard ---- */
-
+/* ---- Dashboard (frontend-only aggregation) ---- */
 export function getDashboard(): DashboardData {
   const orderList = [...orders.values()];
   const paid = orderList.filter((o) => o.status === 'paid' || o.status === 'fulfilled');
   const revenue = paid.reduce((s, o) => s + o.total_cents, 0);
-  const inventory = [...variants.values()].map(toInventoryRow);
-  const low = inventory.filter((r) => r.is_low);
+  const inventory = [...variants.values()];
+  const low = inventory.filter((v) => v.available <= DEFAULT_THRESHOLD).map(toInventoryRow);
 
-  // 14-day order trend (synthetic but stable: derived from order createdAt buckets).
   const trend = Array.from({ length: 14 }).map((_, i) => {
     const day = 13 - i;
     const date = ISO(day, 0).slice(0, 10);
     const dayOrders = orderList.filter((o) => o.createdAt.slice(0, 10) === date);
-    const seedN = (day * 7 + 3) % 9; // smooth-ish baseline so the chart isn't flat
-    return {
-      date,
-      orders: dayOrders.length + seedN,
-      revenue_cents: dayOrders.reduce((s, o) => s + o.total_cents, 0) + seedN * 9900,
-    };
+    const seedN = (day * 7 + 3) % 9;
+    return { date, orders: dayOrders.length + seedN, revenue_cents: dayOrders.reduce((s, o) => s + o.total_cents, 0) + seedN * 9900 };
   });
 
   const sellerCounts = new Map<string, number>();
-  for (const o of orderList) {
-    for (const it of o.items) sellerCounts.set(it.name, (sellerCounts.get(it.name) ?? 0) + it.qty);
-  }
-  const topSellers = [...sellerCounts.entries()]
-    .map(([name, units]) => ({ name, units }))
-    .sort((a, b) => b.units - a.units)
-    .slice(0, 5);
+  for (const o of orderList) for (const it of o.items) sellerCounts.set(it.name, (sellerCounts.get(it.name) ?? 0) + it.qty);
+  const topSellers = [...sellerCounts.entries()].map(([name, units]) => ({ name, units })).sort((a, b) => b.units - a.units).slice(0, 5);
 
   return {
     kpis: {

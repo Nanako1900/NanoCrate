@@ -93,7 +93,17 @@ export function AdminProductEditorPage() {
         navigate(`/admin/products/${created.id}`);
       }
     } catch (e) {
-      setFormError(e instanceof ApiError ? e.message : 'Could not save the product.');
+      // §9.5 validation_failed locates each bad field in error.details[] — map
+      // them back onto the form and focus the first one.
+      if (e instanceof ApiError && e.code === 'validation_failed' && e.details.length) {
+        const mapped: Record<string, string> = {};
+        for (const d of e.details) mapped[d.field] = d.message;
+        setErrors(mapped);
+        focusFirstError(mapped, Boolean(mapped.name));
+        setFormError('Please fix the highlighted fields.');
+      } else {
+        setFormError(e instanceof ApiError ? e.message : 'Could not save the product.');
+      }
     }
   }
 

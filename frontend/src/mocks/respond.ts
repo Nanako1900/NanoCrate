@@ -13,8 +13,16 @@ export function ok<T>(data: T, meta?: PaginationMeta) {
   return HttpResponse.json({ success: true, data, error: null, ...(meta ? { meta } : {}) });
 }
 
-export function fail(code: string, message: string, status = 400) {
-  return HttpResponse.json({ success: false, data: null, error: { code, message } }, { status });
+export function fail(
+  code: string,
+  message: string,
+  status = 400,
+  details?: { field: string; message: string }[],
+) {
+  return HttpResponse.json(
+    { success: false, data: null, error: { code, message, ...(details ? { details } : {}) } },
+    { status },
+  );
 }
 
 export function parsePositiveInt(value: string | null, fallback: number): number {

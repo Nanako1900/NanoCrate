@@ -11,7 +11,7 @@ import {
   updateVariant,
   type AdminProductQuery,
 } from '@/services/admin';
-import type { AdminProductDetail, ProductWriteInput, VariantWriteInput } from '@/services/admin-types';
+import type { AdminProductDetail, AdminVariant, ProductWriteInput, VariantWriteInput } from '@/services/admin-types';
 import { adminKeys } from './keys';
 
 export function useAdminProducts(query: AdminProductQuery) {
@@ -82,16 +82,33 @@ export function useArchiveProduct() {
   });
 }
 
+/** Variant writes return the variant (§9.5) — invalidate the parent product. */
+function useVariantWriteCallbacks() {
+  const qc = useQueryClient();
+  return (variant: AdminVariant) => {
+    if (variant.product_id) void qc.invalidateQueries({ queryKey: adminKeys.product(variant.product_id) });
+    void qc.invalidateQueries({ queryKey: ['admin', 'products'] });
+    void qc.invalidateQueries({ queryKey: ['admin', 'inventory'] });
+    void qc.invalidateQueries({ queryKey: adminKeys.dashboard });
+  };
+}
+
 export function useCreateVariant(productId: string) {
-  const onWritten = useProductWriteCallbacks();
+  const onWritten = useVariantWriteCallbacks();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: VariantWriteInput) => createVariant(productId, input),
-    onSuccess: onWritten,
+    onSuccess: (variant) => {
+      // createVariant's response omits product_id in some cases; ensure the
+      // owning product is refreshed regardless.
+      void qc.invalidateQueries({ queryKey: adminKeys.product(productId) });
+      onWritten(variant);
+    },
   });
 }
 
 export function useUpdateVariant() {
-  const onWritten = useProductWriteCallbacks();
+  const onWritten = useVariantWriteCallbacks();
   return useMutation({
     mutationFn: (vars: { variantId: string; input: Partial<VariantWriteInput> }) =>
       updateVariant(vars.variantId, vars.input),

@@ -10,6 +10,8 @@ import { z } from 'zod';
 export const apiErrorSchema = z.object({
   code: z.string(),
   message: z.string(),
+  // §9.5: validation_failed locates each offending field here.
+  details: z.array(z.object({ field: z.string(), message: z.string() })).optional(),
 });
 export type ApiErrorPayload = z.infer<typeof apiErrorSchema>;
 

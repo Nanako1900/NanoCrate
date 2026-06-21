@@ -12,6 +12,20 @@ import type { PaymentStatus } from '@/services/types';
 
 const PAYMENT_TONE: Record<PaymentStatus, BadgeTone> = { succeeded: 'in', requires_payment: 'low', failed: 'out' };
 
+/** §9.5 admin order detail reuses the §9.4 shape (no server timeline). We derive
+ *  a readable status trail client-side from the order's status + timestamp. */
+function deriveTimeline(order: AdminOrderDetail): { status: string; note: string | null; at: string }[] {
+  const at = order.created_at;
+  const events: { status: string; note: string | null; at: string }[] = [
+    { status: 'pending', note: 'Order created, stock reserved', at },
+  ];
+  if (order.status === 'paid' || order.status === 'fulfilled') events.push({ status: 'paid', note: 'Payment confirmed (webhook)', at });
+  if (order.status === 'fulfilled') events.push({ status: 'fulfilled', note: 'Shipped', at });
+  if (order.status === 'failed') events.push({ status: 'failed', note: 'Payment failed', at });
+  if (order.status === 'cancelled') events.push({ status: 'cancelled', note: 'Stock unavailable at settlement — refunded', at });
+  return events;
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-lg border border-line bg-surface">
@@ -63,8 +77,8 @@ function Body({ order }: { order: AdminOrderDetail }) {
 
       <div className="flex flex-col gap-6">
         <Card title="Customer">
-          <p className="text-sm font-medium text-ink">{order.customer.name}</p>
-          <p className="label-mono mt-0.5 normal-case text-ink-faint">{order.customer.email}</p>
+          <p className="label-mono normal-case text-ink-faint">User</p>
+          <p className="mt-0.5 break-all font-mono text-sm text-ink">{order.user_id ?? '—'}</p>
         </Card>
 
         <Card title="Payment">
@@ -82,8 +96,8 @@ function Body({ order }: { order: AdminOrderDetail }) {
 
         <Card title="Timeline">
           <ol className="flex flex-col gap-0">
-            {order.timeline.map((event, i) => {
-              const last = i === order.timeline.length - 1;
+            {deriveTimeline(order).map((event, i, arr) => {
+              const last = i === arr.length - 1;
               return (
                 <li key={i} className="grid grid-cols-[auto_1fr] gap-x-3">
                   <div className="flex flex-col items-center">

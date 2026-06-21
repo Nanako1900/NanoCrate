@@ -35,7 +35,7 @@ export function AdminProductsPage() {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
-  const [sort, setSort] = useState<SortState>({ key: 'updated_at', dir: 'desc' });
+  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' });
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
@@ -74,7 +74,7 @@ export function AdminProductsPage() {
       sortable: true,
       cell: (p) => (
         <div className="flex items-center gap-3">
-          <img src={p.image} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded border border-line bg-surface-sunken object-cover" loading="lazy" />
+          <img src={`/img/keyboards/${p.slug}.svg`} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded border border-line bg-surface-sunken object-cover" loading="lazy" />
           <div className="min-w-0">
             <p className="truncate font-medium text-ink">{p.name}</p>
             <p className="label-mono normal-case text-ink-faint">{p.slug}</p>
@@ -93,9 +93,9 @@ export function AdminProductsPage() {
       hideBelow: 'sm',
       cell: (p) => (
         <span className="font-mono tabular-nums text-ink">
-          {p.price_min_cents === p.price_max_cents
-            ? formatPrice(p.price_min_cents, p.currency)
-            : `${formatPrice(p.price_min_cents, p.currency)}–${formatPrice(p.price_max_cents, p.currency)}`}
+          {p.price_range_cents.min === p.price_range_cents.max
+            ? formatPrice(p.price_range_cents.min)
+            : `${formatPrice(p.price_range_cents.min)}–${formatPrice(p.price_range_cents.max)}`}
         </span>
       ),
     },

@@ -215,13 +215,14 @@ function MatrixModal({ product, onClose }: { product: AdminProductDetail; onClos
 export function VariantEditor({ product }: { product: AdminProductDetail }) {
   const [single, setSingle] = useState<{ editing: AdminVariant | null } | null>(null);
   const [matrix, setMatrix] = useState(false);
+  const variants = product.variants ?? [];
 
   return (
     <section className="rounded-lg border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
         <div>
           <h2 className="text-sm font-semibold text-ink">Variants &amp; SKUs</h2>
-          <p className="label-mono normal-case text-ink-faint">{product.variants.length} variants</p>
+          <p className="label-mono normal-case text-ink-faint">{variants.length} variants</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setMatrix(true)}>
@@ -234,7 +235,7 @@ export function VariantEditor({ product }: { product: AdminProductDetail }) {
         </div>
       </div>
 
-      {product.variants.length === 0 ? (
+      {variants.length === 0 ? (
         <p className="px-5 py-8 text-center text-sm text-ink-soft">No variants yet. Add one, or generate a set from an option matrix.</p>
       ) : (
         <div className="overflow-x-auto">
@@ -251,13 +252,13 @@ export function VariantEditor({ product }: { product: AdminProductDetail }) {
               </tr>
             </thead>
             <tbody>
-              {product.variants.map((v) => (
+              {variants.map((v) => (
                 <tr key={v.id} className="border-b border-line/60 last:border-0">
                   <td className="px-5 py-2.5 font-mono uppercase text-ink">{v.sku}</td>
                   <td className="px-3 py-2.5 text-ink-soft">{v.name}</td>
                   <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink">{formatPrice(v.price_cents, v.currency)}</td>
                   <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink">{v.available}</td>
-                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-faint">{v.reserved}</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-faint">{v.reserved ?? 0}</td>
                   <td className="px-3 py-2.5 text-right">
                     <IconButton label={`Edit ${v.sku}`} size="sm" onClick={() => setSingle({ editing: v })}>
                       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
