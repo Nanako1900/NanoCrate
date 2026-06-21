@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
+	"github.com/Nanako1900/NanoCrate/backend/internal/admin"
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
 	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	"github.com/Nanako1900/NanoCrate/backend/internal/catalog"
@@ -31,6 +32,7 @@ type apiDeps struct {
 	cart     *cart.Handler
 	order    *order.Handler
 	checkout *checkout.Handler
+	admin    *admin.Handler
 }
 
 // newRouter wires middleware, probes, metrics, and the public/session/user/admin
@@ -69,8 +71,10 @@ func newRouter(d apiDeps) *gin.Engine {
 	d.order.Register(user)
 	user.GET("/me", me)
 
-	// Admin RBAC stub.
-	v1.GET("/admin/ping", d.verifier.RequireUser(), d.verifier.RequireRole("admin"), adminPing)
+	// Admin: requires a valid token AND the realm "admin" role (docs §9.5/§10).
+	adminGroup := v1.Group("", d.verifier.RequireUser(), d.verifier.RequireRole("admin"))
+	adminGroup.GET("/admin/ping", adminPing)
+	d.admin.RegisterAdmin(adminGroup)
 
 	return r
 }

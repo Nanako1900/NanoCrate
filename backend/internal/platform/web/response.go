@@ -20,10 +20,12 @@ type Envelope struct {
 	Meta    any       `json:"meta,omitempty"`
 }
 
-// APIError is the error payload carried by a failed response.
+// APIError is the error payload carried by a failed response. Details is optional
+// and carries field-level locators for validation errors (docs §9.5).
 type APIError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 // PageMeta is the pagination metadata returned for list endpoints.
@@ -57,6 +59,11 @@ func OKWithMeta(c *gin.Context, data any, meta any) {
 // Fail writes a failure envelope with the given HTTP status and error code.
 func Fail(c *gin.Context, status int, code, message string) {
 	c.JSON(status, Envelope{Success: false, Error: &APIError{Code: code, Message: message}})
+}
+
+// FailDetails writes a failure envelope carrying field-level details (validation).
+func FailDetails(c *gin.Context, status int, code, message string, details any) {
+	c.JSON(status, Envelope{Success: false, Error: &APIError{Code: code, Message: message, Details: details}})
 }
 
 // AbortFail writes a failure envelope and aborts the middleware chain.

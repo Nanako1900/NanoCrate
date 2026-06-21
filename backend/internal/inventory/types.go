@@ -28,6 +28,7 @@ const (
 	kindCommit  = "commit"
 	kindRelease = "release"
 	kindExpire  = "expire"
+	kindRestock = "restock"
 )
 
 func pgUUID(id uuid.UUID) pgtype.UUID {

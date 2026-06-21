@@ -32,6 +32,17 @@ FROM inventory WHERE variant_id = $1;
 UPDATE inventory SET available = $2, reserved = $3, updated_at = now()
 WHERE variant_id = $1;
 
+-- name: RestockStock :execrows
+-- 补货(admin):available += qty。库存行不存在则建之(新规格首次补货)。
+INSERT INTO inventory (variant_id, available, reserved) VALUES ($1, $2, 0)
+ON CONFLICT (variant_id) DO UPDATE
+    SET available = inventory.available + EXCLUDED.available, updated_at = now();
+
+-- name: EnsureInventoryRow :exec
+-- 新建规格时建空库存行(available 0)。
+INSERT INTO inventory (variant_id, available, reserved) VALUES ($1, 0, 0)
+ON CONFLICT (variant_id) DO NOTHING;
+
 -- name: CreateReservation :one
 INSERT INTO reservations (order_id, variant_id, qty, status, expires_at)
 VALUES ($1, $2, $3, 'held', $4)

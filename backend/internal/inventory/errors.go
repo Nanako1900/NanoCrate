@@ -14,6 +14,9 @@ var ErrOutOfStock = errors.New("out of stock")
 // other than 'held' (already committed, released, or expired) — a lost race.
 var ErrReservationNotHeld = errors.New("reservation not held")
 
+// ErrInvalidRestock means a restock was requested with a non-positive quantity.
+var ErrInvalidRestock = errors.New("restock quantity must be positive")
+
 // ErrStockConservation means an atomic stock transition (commit/release) affected
 // a number of rows other than exactly one — the available/reserved invariant has
 // been violated. It is a hard, transaction-aborting error: better to fail loudly
