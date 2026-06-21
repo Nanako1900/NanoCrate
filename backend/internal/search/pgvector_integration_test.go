@@ -15,6 +15,15 @@ import (
 
 const keyboardType = "11111111-1111-1111-1111-111111111111"
 
+// clearProducts removes the migration seed so a ranking test controls its dataset
+// (the product_types row is preserved for re-seeding).
+func clearProducts(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `TRUNCATE products CASCADE`); err != nil {
+		t.Fatalf("clear products: %v", err)
+	}
+}
+
 // seedProduct inserts an active product (under the seeded keyboard type) and
 // returns its id; text is what we index for search.
 func seedProduct(t *testing.T, pool *pgxpool.Pool, slug, name, desc string) uuid.UUID {
@@ -51,6 +60,7 @@ func TestIntegration_HybridSearch_FuzzyDescriptionFindsKeyboard(t *testing.T) {
 	pool := testutil.StartPostgres(t)
 	ctx := context.Background()
 	sp := search.NewPgVector(pool, search.NewStubEmbedder())
+	clearProducts(t, pool)
 
 	full := seedProduct(t, pool, "test-full", "Nano Full",
 		"full size keyboard with silent linear switches, quiet and great for the office and finance work")
@@ -99,6 +109,7 @@ func TestIntegration_Search_KeywordRecallAndArchivedExcluded(t *testing.T) {
 	pool := testutil.StartPostgres(t)
 	ctx := context.Background()
 	sp := search.NewPgVector(pool, search.NewStubEmbedder())
+	clearProducts(t, pool)
 
 	id := seedProduct(t, pool, "test-tkl", "Tenkeyless Pro", "tenkeyless aluminium keyboard for typists")
 	indexAll(t, sp, map[uuid.UUID]string{id: "Tenkeyless Pro tenkeyless aluminium keyboard typists"})

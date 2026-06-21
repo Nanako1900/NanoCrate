@@ -38,6 +38,7 @@ func (l testLoader) LoadProductForIndex(ctx context.Context, id uuid.UUID) (stri
 func TestIntegration_ProductUpsert_EmitsEventAndIndexes(t *testing.T) {
 	pool := testutil.StartPostgres(t)
 	ctx := context.Background()
+	clearProducts(t, pool)
 	adminSvc := admin.NewService(pool, inventory.NewService(pool, nil))
 
 	pv, err := adminSvc.CreateProduct(ctx, admin.CreateProductRequest{
