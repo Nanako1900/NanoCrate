@@ -57,12 +57,30 @@ for (const theme of ['light', 'dark'] as const) {
   test(`${theme} theme meets AA for shipped text pairs`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme });
     await page.goto('/');
-    await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
+    await page.evaluate((t) => {
+      document.documentElement.dataset.theme = t;
+      delete document.documentElement.dataset.skin;
+    }, theme);
 
     const result = await ratios(page);
     for (const [fg, bg, min] of PAIRS) {
       const got = result[`${fg} on ${bg}`];
       expect(got, `${fg} on ${bg} (${theme})`).toBeGreaterThanOrEqual(min);
+    }
+  });
+
+  test(`admin indigo skin ${theme} meets AA for shipped text pairs`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto('/');
+    await page.evaluate((t) => {
+      document.documentElement.dataset.theme = t;
+      document.documentElement.dataset.skin = 'admin';
+    }, theme);
+
+    const result = await ratios(page);
+    for (const [fg, bg, min] of PAIRS) {
+      const got = result[`${fg} on ${bg}`];
+      expect(got, `${fg} on ${bg} (admin ${theme})`).toBeGreaterThanOrEqual(min);
     }
   });
 }

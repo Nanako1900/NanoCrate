@@ -23,6 +23,16 @@ export function AdminShell() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Scope the indigo admin skin to the whole document while the console is
+  // mounted, so portaled toasts/dialogs/⌘K inherit it too. Removed on leave →
+  // the storefront keeps its warm palette.
+  useEffect(() => {
+    document.documentElement.dataset.skin = 'admin';
+    return () => {
+      delete document.documentElement.dataset.skin;
+    };
+  }, []);
+
   return (
     <ToastProvider>
       <a

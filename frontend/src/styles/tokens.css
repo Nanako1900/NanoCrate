@@ -169,3 +169,54 @@
   --blueprint-line: var(--line);
   --blueprint-opacity: 0.6;
 }
+
+/*
+ * Admin skin — a scoped Stripe-style indigo re-skin (cool neutral surfaces +
+ * indigo accent/interactive). Applied via data-skin="admin" on the admin shell
+ * ONLY, so the storefront keeps its warm paper palette. Both themes are
+ * mirrored and AA-checked. The semantic stock tri-state is inherited unchanged.
+ */
+[data-skin='admin'] {
+  /* cool neutral surfaces */
+  --paper: oklch(98.4% 0.003 264);
+  --surface: oklch(100% 0 0);
+  --surface-sunken: oklch(96.6% 0.005 264);
+  --surface-invert: oklch(24% 0.03 274);
+  --ink: oklch(25% 0.02 266);
+  --ink-soft: oklch(45% 0.02 266);
+  --ink-faint: oklch(50% 0.02 266); /* AA on white/sunken */
+  --ink-invert: oklch(98% 0.005 264);
+  --line: oklch(91% 0.008 262);
+  --line-strong: oklch(83% 0.012 262);
+  /* indigo accent (Stripe-ish) */
+  --accent: oklch(53% 0.21 274);
+  --accent-strong: oklch(47% 0.21 274);
+  --accent-soft: oklch(95% 0.035 274);
+  --accent-ink: oklch(99% 0.01 274);
+  --interactive: oklch(53% 0.21 274);
+  --interactive-strong: oklch(46% 0.21 274);
+  --interactive-soft: oklch(95% 0.035 274);
+  --blueprint-line: var(--line);
+  --blueprint-opacity: 1;
+}
+
+[data-theme='dark'][data-skin='admin'] {
+  --paper: oklch(20% 0.015 270);
+  --surface: oklch(24% 0.018 270);
+  --surface-sunken: oklch(16.5% 0.015 270);
+  --surface-invert: oklch(95% 0.008 264);
+  --ink: oklch(94% 0.01 270);
+  --ink-soft: oklch(78% 0.015 270);
+  --ink-faint: oklch(69% 0.015 270); /* AA on dark cool surfaces */
+  --ink-invert: oklch(22% 0.02 270);
+  --line: oklch(33% 0.02 270);
+  --line-strong: oklch(43% 0.022 270);
+  --accent: oklch(72% 0.17 274);
+  --accent-strong: oklch(79% 0.15 274);
+  --accent-soft: oklch(32% 0.09 274);
+  --accent-ink: oklch(16% 0.04 274);
+  --interactive: oklch(74% 0.16 274);
+  --interactive-strong: oklch(82% 0.13 274);
+  --interactive-soft: oklch(30% 0.08 274);
+  --blueprint-opacity: 0.6;
+}
