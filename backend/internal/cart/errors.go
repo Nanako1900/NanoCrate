@@ -10,3 +10,7 @@ var ErrVariantNotFound = errors.New("variant not found")
 
 // ErrItemNotFound means the cart item does not exist in the resolved cart.
 var ErrItemNotFound = errors.New("cart item not found")
+
+// ErrQtyTooLarge means a mutation would push a line's quantity above MaxLineQty
+// (e.g. an accumulating add). Reported as validation_failed.
+var ErrQtyTooLarge = errors.New("cart line quantity exceeds maximum")

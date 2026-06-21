@@ -9,3 +9,9 @@ DROP INDEX IF EXISTS idx_orders_pi;
 CREATE UNIQUE INDEX idx_orders_pi
     ON orders (stripe_payment_intent_id)
     WHERE stripe_payment_intent_id IS NOT NULL;
+
+-- B9: bound a cart line's quantity so repeated accumulating upserts cannot
+-- overflow int32 (or lock a whole SKU). The cap (999) must match
+-- cart.MaxLineQty in the Go code. Handlers reject over-cap requests at the
+-- boundary; this CHECK is the backstop for the upsert's running total.
+ALTER TABLE cart_items ADD CONSTRAINT cart_items_qty_max CHECK (qty <= 999);

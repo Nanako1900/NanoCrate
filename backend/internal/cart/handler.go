@@ -21,6 +21,8 @@ const (
 	// overflow from repeated accumulating adds (B9) and against a single line
 	// locking an entire SKU at checkout (B7).
 	MaxLineQty = 999
+
+	qtyRangeMessage = "qty must be between 1 and 999"
 )
 
 // Handler exposes the session-scoped cart endpoints (contract §9.4).
@@ -68,8 +70,8 @@ func (h *Handler) addItem(c *gin.Context) {
 		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "invalid variant_id")
 		return
 	}
-	if body.Qty < 1 {
-		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "qty must be >= 1")
+	if body.Qty < 1 || body.Qty > MaxLineQty {
+		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, qtyRangeMessage)
 		return
 	}
 	cartID, ok := h.resolve(c)
@@ -94,8 +96,8 @@ func (h *Handler) updateItem(c *gin.Context) {
 		return
 	}
 	var body qtyBody
-	if err := c.ShouldBindJSON(&body); err != nil || body.Qty < 1 {
-		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "qty must be >= 1")
+	if err := c.ShouldBindJSON(&body); err != nil || body.Qty < 1 || body.Qty > MaxLineQty {
+		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, qtyRangeMessage)
 		return
 	}
 	cartID, ok := h.resolve(c)
@@ -171,6 +173,8 @@ func (h *Handler) mutationError(c *gin.Context, err error) {
 		web.Fail(c, http.StatusNotFound, web.CodeNotFound, "variant not found")
 	case errors.Is(err, ErrItemNotFound):
 		web.Fail(c, http.StatusNotFound, web.CodeNotFound, "cart item not found")
+	case errors.Is(err, ErrQtyTooLarge):
+		web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, qtyRangeMessage)
 	default:
 		web.Fail(c, http.StatusInternalServerError, web.CodeInternal, "cart operation failed")
 	}

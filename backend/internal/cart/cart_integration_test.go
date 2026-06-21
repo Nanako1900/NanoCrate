@@ -65,6 +65,91 @@ func TestIntegration_Cart_GuestFlow(t *testing.T) {
 	}
 }
 
+// B9: a cart line's quantity is bounded to [1, MaxLineQty]. An over-cap request
+// is rejected at the boundary, and accumulating adds cannot exceed the cap either
+// (defense against int32 overflow), enforced by a DB CHECK.
+func TestIntegration_Cart_RejectsQtyOverMax(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	variantID := testutil.SeedVariant(t, pool, 100)
+	router := buildCartRouter(t, pool)
+	jar := map[string]string{}
+
+	// Direct over-cap add is rejected at the boundary.
+	code, body := reqCode(t, router, http.MethodPost, "/cart/items", jar,
+		map[string]any{"variant_id": variantID.String(), "qty": cart.MaxLineQty + 1})
+	if code != http.StatusBadRequest || errCode(body) != "validation_failed" {
+		t.Fatalf("over-cap add = %d (%v), want 400 validation_failed", code, body)
+	}
+
+	// A valid add, then a PATCH over the cap is rejected.
+	_, body = reqCode(t, router, http.MethodPost, "/cart/items", jar,
+		map[string]any{"variant_id": variantID.String(), "qty": 1})
+	itemID := body["data"].(map[string]any)["items"].([]any)[0].(map[string]any)["id"].(string)
+	code, body = reqCode(t, router, http.MethodPatch, "/cart/items/"+itemID, jar,
+		map[string]any{"qty": cart.MaxLineQty + 1})
+	if code != http.StatusBadRequest || errCode(body) != "validation_failed" {
+		t.Fatalf("over-cap patch = %d (%v), want 400 validation_failed", code, body)
+	}
+}
+
+// B9: each add is individually within the cap but their accumulation exceeds it;
+// the upsert's running total must be rejected (DB CHECK), not silently overflow.
+func TestIntegration_Cart_RejectsAccumulationOverMax(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	variantID := testutil.SeedVariant(t, pool, 100)
+	router := buildCartRouter(t, pool)
+	jar := map[string]string{}
+
+	half := int32(cart.MaxLineQty/2 + 1) // two of these exceed the cap
+	if code, body := reqCode(t, router, http.MethodPost, "/cart/items", jar,
+		map[string]any{"variant_id": variantID.String(), "qty": half}); code != http.StatusOK {
+		t.Fatalf("first add = %d (%v), want 200", code, body)
+	}
+	code, body := reqCode(t, router, http.MethodPost, "/cart/items", jar,
+		map[string]any{"variant_id": variantID.String(), "qty": half})
+	if code != http.StatusBadRequest || errCode(body) != "validation_failed" {
+		t.Fatalf("accumulating add = %d (%v), want 400 validation_failed", code, body)
+	}
+}
+
+func errCode(body map[string]any) string {
+	e, ok := body["error"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := e["code"].(string)
+	return s
+}
+
+// reqCode is like req but returns the status code instead of failing on non-200.
+func reqCode(t *testing.T, r *gin.Engine, method, path string, jar map[string]string, body any) (int, map[string]any) {
+	t.Helper()
+	var reader *bytes.Reader
+	if body != nil {
+		raw, _ := json.Marshal(body)
+		reader = bytes.NewReader(raw)
+	} else {
+		reader = bytes.NewReader(nil)
+	}
+	httpReq := httptest.NewRequest(method, path, reader)
+	if body != nil {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range jar {
+		httpReq.AddCookie(&http.Cookie{Name: k, Value: v})
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httpReq)
+	for _, ck := range w.Result().Cookies() {
+		jar[ck.Name] = ck.Value
+	}
+	var decoded map[string]any
+	if w.Body.Len() > 0 {
+		_ = json.Unmarshal(w.Body.Bytes(), &decoded)
+	}
+	return w.Code, decoded
+}
+
 // req performs a request, persists any Set-Cookie into the jar, and returns the
 // decoded envelope.
 func req(t *testing.T, r *gin.Engine, method, path string, jar map[string]string, body any) map[string]any {

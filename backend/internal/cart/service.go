@@ -72,6 +72,10 @@ func (s *Service) AddItem(ctx context.Context, cartID, variantID uuid.UUID, qty 
 	if isForeignKeyViolation(err) {
 		return ErrVariantNotFound
 	}
+	if isCheckViolation(err) {
+		// The accumulating upsert pushed the running total above the cap (B9).
+		return ErrQtyTooLarge
+	}
 	if err != nil {
 		return fmt.Errorf("upsert cart item: %w", err)
 	}
@@ -91,6 +95,9 @@ func (s *Service) UpdateItem(ctx context.Context, cartID, itemID uuid.UUID, qty 
 		return ErrItemNotFound
 	}
 	if _, err := s.q.UpdateCartItemQty(ctx, cartdb.UpdateCartItemQtyParams{ID: itemID, Qty: qty}); err != nil {
+		if isCheckViolation(err) {
+			return ErrQtyTooLarge
+		}
 		return fmt.Errorf("update cart item: %w", err)
 	}
 	return nil
@@ -124,4 +131,9 @@ func (s *Service) Snapshot(ctx context.Context, cartID uuid.UUID) (View, error) 
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
 }
