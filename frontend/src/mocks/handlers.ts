@@ -207,8 +207,12 @@ export const handlers = [
   http.post(`${BASE}/mock/confirm-payment`, async ({ request }) => {
     await delay(LATENCY_MS);
     const body = (await request.json().catch(() => null)) as { order_id?: string } | null;
-    const ok_ = body?.order_id ? confirmMockPayment(body.order_id) : false;
-    if (!ok_) return fail('not_found', 'Order not found.', 404);
+    const result = body?.order_id ? confirmMockPayment(body.order_id) : 'not_found';
+    if (result === 'not_found') return fail('not_found', 'Order not found.', 404);
+    if (result === 'out_of_stock') {
+      // Stock ran out before settlement — the order is compensated to cancelled.
+      return fail('out_of_stock', 'Reserved stock is unavailable. Adjust your cart and try again.', 409);
+    }
     return ok({ status: 'processing' });
   }),
 

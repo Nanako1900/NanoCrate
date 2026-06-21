@@ -91,4 +91,46 @@ describe('checkout + orders', () => {
       code: 'validation_failed',
     });
   });
+
+  it('replays the same order for a repeated Idempotency-Key (no duplicate)', async () => {
+    const cart = await addCartItem({ variant_id: 'v_nano75_red', qty: 1 });
+    const key = 'idem-key-fixed-001';
+
+    const first = await checkout(cart.id, { idempotencyKey: key, mockOutcome: 'succeeded' });
+    const second = await checkout(cart.id, { idempotencyKey: key, mockOutcome: 'succeeded' });
+    expect(second.order_id).toBe(first.order_id);
+
+    // A different key on the same cart creates a distinct order.
+    const other = await checkout(cart.id, { idempotencyKey: 'idem-key-fixed-002', mockOutcome: 'succeeded' });
+    expect(other.order_id).not.toBe(first.order_id);
+  });
+});
+
+describe('inventory (F10)', () => {
+  it('decrements available after a paid settlement', async () => {
+    // v_nano75_red starts at 12; buy 5 and settle → 7 left, reflected in the cart.
+    await addCartItem({ variant_id: 'v_nano75_red', qty: 5 });
+    const cart = await getCart();
+    const result = await checkout(cart.id, { mockOutcome: 'succeeded' });
+    await confirmMockPayment(result.order_id);
+
+    // The settled cart is cleared; re-add the same variant to read live stock.
+    const after = await addCartItem({ variant_id: 'v_nano75_red', qty: 1 });
+    expect(after.items[0].available).toBe(7);
+  });
+
+  it('oversell → second settlement reports out_of_stock and the order is cancelled', async () => {
+    // Two orders created from one cart (distinct keys), each wanting all 12 units.
+    const cart = await addCartItem({ variant_id: 'v_nano75_red', qty: 12 });
+    const a = await checkout(cart.id, { idempotencyKey: 'oversell-a', mockOutcome: 'succeeded' });
+    const b = await checkout(cart.id, { idempotencyKey: 'oversell-b', mockOutcome: 'succeeded' });
+
+    // A settles first and drains the stock.
+    await confirmMockPayment(a.order_id);
+    expect((await getOrder(a.order_id)).status).toBe('paid');
+
+    // B now oversells — settlement rejects and the order is compensated to cancelled.
+    await expect(confirmMockPayment(b.order_id)).rejects.toMatchObject({ code: 'out_of_stock' });
+    expect((await getOrder(b.order_id)).status).toBe('cancelled');
+  });
 });
