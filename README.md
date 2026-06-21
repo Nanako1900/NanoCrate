@@ -13,6 +13,11 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 16"/>
 </p>
 
+<p align="center">
+  <b>English</b> ·
+  <a href="./README.zh-CN.md">简体中文</a>
+</p>
+
 ---
 
 NanoCrate is a full-stack, **modular-monolith** e-commerce platform you can fork and adapt to any vertical. It is deliberately **not** "yet another store" — the value lives in the architecture: a flexible product model, four clean extension interfaces, a reservation-based inventory system that **never oversells**, and semantic search. It ships with a seeded **mechanical-keyboard store** as a working reference and live demo.
