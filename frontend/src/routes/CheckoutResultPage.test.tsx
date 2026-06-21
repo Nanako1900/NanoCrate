@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,7 +11,7 @@ beforeEach(() => {
   __resetMockStore();
 });
 
-function renderResult(orderId: string): ReactNode {
+function renderResult(orderId: string) {
   const queryClient = createQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
