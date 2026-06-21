@@ -15,6 +15,12 @@ import (
 	"github.com/Nanako1900/NanoCrate/backend/internal/payment"
 )
 
+// errOrderNotYetVisible means a settlement event referenced a payment intent that
+// is not on any order yet — the webhook raced ahead of checkout storing the PI id.
+// It is deliberately NOT recorded as processed, so the caller can return a 5xx and
+// let the gateway retry once the order becomes visible.
+var errOrderNotYetVisible = errors.New("order not visible for payment intent yet")
+
 // HandleWebhook verifies the payment webhook signature and processes it exactly
 // once (SPEC §7). On success the order is paid and reservations committed; on
 // failure/cancel the reservations are released.
@@ -26,7 +32,24 @@ func (s *Service) HandleWebhook(ctx context.Context, payload []byte, signatureHe
 	return s.process(ctx, event)
 }
 
+// isSettlementEvent reports whether an event actually changes order/stock state.
+// Everything else (Stripe sends many unrelated event types to one endpoint) is
+// acknowledged without touching the database.
+func isSettlementEvent(t payment.EventType) bool {
+	switch t {
+	case payment.EventPaymentSucceeded, payment.EventPaymentFailed, payment.EventPaymentCanceled:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Service) process(ctx context.Context, event payment.Event) error {
+	// Events we never act on are acknowledged immediately (no DB work, no retries).
+	if !isSettlementEvent(event.Type) {
+		return nil
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin webhook tx: %w", err)
@@ -36,22 +59,27 @@ func (s *Service) process(ctx context.Context, event payment.Event) error {
 	orderQ := orderdb.New(tx)
 	invQ := invdb.New(tx)
 
-	// Idempotency: first writer processes; duplicates affect zero rows and skip.
+	// Find the order FIRST. If the payment intent is not on any order yet, do NOT
+	// record the event as processed — roll back and surface a retryable error so
+	// the gateway re-delivers once checkout has stored the PI id. Recording it here
+	// would dedup every retry into a no-op and the order would never settle (B1).
+	pid := event.PaymentIntentID
+	order, err := orderQ.GetOrderByPaymentIntent(ctx, &pid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errOrderNotYetVisible
+	}
+	if err != nil {
+		return fmt.Errorf("find order by payment intent: %w", err)
+	}
+
+	// Idempotency: now that the order exists, record the event. Duplicate
+	// deliveries affect zero rows and commit as a no-op.
 	inserted, err := orderQ.InsertProcessedEvent(ctx, event.ID)
 	if err != nil {
 		return fmt.Errorf("record processed event: %w", err)
 	}
 	if inserted == 0 {
 		return tx.Commit(ctx)
-	}
-
-	pid := event.PaymentIntentID
-	order, err := orderQ.GetOrderByPaymentIntent(ctx, &pid)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return tx.Commit(ctx) // unknown order; event recorded, ack anyway
-	}
-	if err != nil {
-		return fmt.Errorf("find order by payment intent: %w", err)
 	}
 
 	if err := s.applyEvent(ctx, orderQ, invQ, order, event.Type); err != nil {

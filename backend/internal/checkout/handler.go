@@ -99,6 +99,12 @@ func (h *Handler) webhook(c *gin.Context) {
 			web.Fail(c, http.StatusBadRequest, web.CodeValidationFailed, "invalid signature")
 			return
 		}
+		if errors.Is(err, errOrderNotYetVisible) {
+			// Order not visible yet (webhook raced ahead of checkout). Ask the
+			// gateway to retry; nothing was recorded, so the retry will settle it.
+			web.Fail(c, http.StatusServiceUnavailable, web.CodeInternal, "order not ready, retry")
+			return
+		}
 		slog.ErrorContext(c.Request.Context(), "webhook processing failed",
 			"error", err, "request_id", web.RequestIDFromContext(c.Request.Context()))
 		web.Fail(c, http.StatusInternalServerError, web.CodeInternal, "webhook processing failed")
