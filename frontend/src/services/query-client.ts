@@ -39,4 +39,7 @@ export const queryKeys = {
   products: (params: Record<string, unknown>) => ['products', params] as const,
   product: (slug: string) => ['product', slug] as const,
   search: (query: string, limit: number) => ['search', query, limit] as const,
+  cart: ['cart'] as const,
+  orders: (page: number, limit: number) => ['orders', page, limit] as const,
+  order: (id: string) => ['order', id] as const,
 };

@@ -31,6 +31,13 @@ export function pluralize(count: number, singular: string, plural = `${singular}
   return count === 1 ? singular : plural;
 }
 
+/** Format an ISO timestamp as a short, locale-aware date (e.g. "Jun 20, 2026"). */
+export function formatDate(iso: string, locale = 'en-US'): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+}
+
 /**
  * Condense a flexible attribute map into short chip labels for cards:
  *  - boolean `true` → the humanized key ("Hot swappable"); `false` is dropped
