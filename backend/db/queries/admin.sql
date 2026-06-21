@@ -3,6 +3,10 @@
 -- name: GetProductTypeByKey :one
 SELECT id, key, name, attribute_schema FROM product_types WHERE key = $1;
 
+-- name: ListProductsForIndex :many
+-- 搜索 backfill:取所有 active 商品的可索引文本来源。
+SELECT id, name, description, attributes FROM products WHERE status = 'active' ORDER BY created_at;
+
 -- name: AdminListProducts :many
 SELECT
     p.id, p.slug, p.name, pt.key AS type, p.status,

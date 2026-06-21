@@ -113,6 +113,7 @@ type Product struct {
 	Embedding     pgvector.Vector `json:"embedding"`
 	CreatedAt     time.Time       `json:"created_at"`
 	UpdatedAt     time.Time       `json:"updated_at"`
+	SearchTsv     interface{}     `json:"search_tsv"`
 }
 
 type ProductType struct {

@@ -1,5 +1,10 @@
 -- 事件基础设施查询(outbox relay 发布 + 消费者幂等去重 + DLQ)。
 
+-- name: InsertOutbox :exec
+-- 在业务事务内写出箱(与产品写入等同事务,保证可靠投递)。
+INSERT INTO outbox (aggregate_type, aggregate_id, event_type, payload, trace_parent)
+VALUES ($1, $2, $3, $4, $5);
+
 -- name: ListUnpublishedOutbox :many
 -- relay 轮询:按 id 顺序取未发布的 outbox 行(FIFO)。
 SELECT id, aggregate_type, aggregate_id, event_type, payload, trace_parent, created_at
