@@ -9,8 +9,16 @@ import {
   productTypeSchema,
   searchResponseSchema,
   checkoutResponseSchema,
+  cartSchema,
+  orderListSchema,
+  orderDetailSchema,
+  type AddCartItemInput,
   type ApiErrorCode,
+  type Cart,
   type CheckoutResponse,
+  type MockPaymentOutcome,
+  type OrderDetail,
+  type OrderListResult,
   type PaginationMeta,
   type ProductDetail,
   type ProductListParams,
@@ -60,6 +68,7 @@ interface RequestOptions<T> {
   schema: z.ZodType<T>;
   auth?: boolean;
   idempotencyKey?: string;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
 }
 
@@ -69,7 +78,7 @@ interface ApiResult<T> {
 }
 
 async function request<T>(path: string, options: RequestOptions<T>): Promise<ApiResult<T>> {
-  const { method = 'GET', body, schema, auth = false, idempotencyKey, signal } = options;
+  const { method = 'GET', body, schema, auth = false, idempotencyKey, headers: extraHeaders, signal } = options;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -78,6 +87,7 @@ async function request<T>(path: string, options: RequestOptions<T>): Promise<Api
     const token = getAuthToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  if (extraHeaders) Object.assign(headers, extraHeaders);
 
   let response: Response;
   try {
@@ -85,6 +95,16 @@ async function request<T>(path: string, options: RequestOptions<T>): Promise<Api
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      // Send credentials so the guest session cart cookie (§9.2) rides along.
+      // In mock mode this is same-origin and inert. In LIVE mode the API is a
+      // different origin (VITE_API_BASE_URL), so this is a *credentialed
+      // cross-origin* request and the backend MUST answer with a matching CORS
+      // contract or the browser drops the response:
+      //   Access-Control-Allow-Origin: <the exact storefront origin>  (never `*`)
+      //   Access-Control-Allow-Credentials: true
+      //   Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key
+      // Tracked as a backend.md §9.2 follow-up (contract owned by the backend).
+      credentials: 'include',
       signal,
     });
   } catch (error: unknown) {
@@ -181,15 +201,108 @@ export async function searchProducts(
   return data;
 }
 
-/* ---- Checkout (Phase 2 wiring — included for contract completeness) ---- */
+/* ---- Cart (Phase 2, §9.4). Mutations return the whole latest cart. ---- */
 
-export async function checkout(cartId: string, signal?: AbortSignal): Promise<CheckoutResponse> {
+export async function getCart(signal?: AbortSignal): Promise<Cart> {
+  const { data } = await request('/cart', { schema: cartSchema, auth: true, signal });
+  return data;
+}
+
+export async function addCartItem(input: AddCartItemInput, signal?: AbortSignal): Promise<Cart> {
+  const { data } = await request('/cart/items', {
+    method: 'POST',
+    body: input,
+    schema: cartSchema,
+    auth: true,
+    signal,
+  });
+  return data;
+}
+
+export async function updateCartItem(itemId: string, qty: number, signal?: AbortSignal): Promise<Cart> {
+  const { data } = await request(`/cart/items/${encodeURIComponent(itemId)}`, {
+    method: 'PATCH',
+    body: { qty },
+    schema: cartSchema,
+    auth: true,
+    signal,
+  });
+  return data;
+}
+
+export async function removeCartItem(itemId: string, signal?: AbortSignal): Promise<Cart> {
+  const { data } = await request(`/cart/items/${encodeURIComponent(itemId)}`, {
+    method: 'DELETE',
+    schema: cartSchema,
+    auth: true,
+    signal,
+  });
+  return data;
+}
+
+/* ---- Checkout (§9.3). Idempotency-Key supplied by the caller. ---- */
+
+/**
+ * `idempotencyKey` is owned by the caller (the checkout hook), NOT minted here:
+ * one key per *logical* checkout attempt, reused across retries so a retried
+ * checkout replays the same order instead of creating a duplicate (§9.1, mirrors
+ * the backend's checkout saga). Minting a fresh UUID per call would defeat the
+ * header entirely — exactly the duplicate-order risk we're guarding against.
+ *
+ * `mockOutcome` injects a mock-only `X-Mock-Outcome` header used by MSW to
+ * simulate success / failure / out-of-stock. A real backend ignores it; the
+ * real payment result is decided by Stripe + the webhook (SPEC §7).
+ */
+export async function checkout(
+  cartId: string,
+  options: { idempotencyKey?: string; mockOutcome?: MockPaymentOutcome; signal?: AbortSignal } = {},
+): Promise<CheckoutResponse> {
   const { data } = await request('/checkout', {
     method: 'POST',
     body: { cart_id: cartId },
     schema: checkoutResponseSchema,
     auth: true,
-    idempotencyKey: crypto.randomUUID(),
+    idempotencyKey: options.idempotencyKey,
+    headers: options.mockOutcome ? { 'X-Mock-Outcome': options.mockOutcome } : undefined,
+    signal: options.signal,
+  });
+  return data;
+}
+
+/**
+ * MOCK-ONLY: stands in for the user submitting the Payment Element + the Stripe
+ * webhook landing. Never called in live mode (real flow uses Stripe.js).
+ */
+export async function confirmMockPayment(orderId: string, signal?: AbortSignal): Promise<void> {
+  await request('/mock/confirm-payment', {
+    method: 'POST',
+    body: { order_id: orderId },
+    schema: z.object({ status: z.string() }),
+    signal,
+  });
+}
+
+/* ---- Orders (§9.4) ---- */
+
+export async function getOrders(
+  page = 1,
+  limit = 20,
+  signal?: AbortSignal,
+): Promise<OrderListResult> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+  const { data, meta } = await request(`/orders?${query}`, {
+    schema: orderListSchema,
+    auth: true,
+    signal,
+  });
+  const fallbackMeta: PaginationMeta = { total: data.length, page, limit };
+  return { orders: data, meta: meta ?? fallbackMeta };
+}
+
+export async function getOrder(id: string, signal?: AbortSignal): Promise<OrderDetail> {
+  const { data } = await request(`/orders/${encodeURIComponent(id)}`, {
+    schema: orderDetailSchema,
+    auth: true,
     signal,
   });
   return data;

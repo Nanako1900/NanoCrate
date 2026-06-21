@@ -120,3 +120,82 @@ export interface ProductListResult {
   items: ProductListItem[];
   meta: PaginationMeta;
 }
+
+/* ---- Cart (§9.4 GET /cart · POST/PATCH/DELETE /cart/items) ----
+ * Every mutation returns the whole latest cart so the client can replace cache. */
+export const cartItemSchema = z.object({
+  id: z.string(),
+  variant_id: z.string(),
+  sku: z.string(),
+  name: z.string(),
+  unit_price_cents: z.number(),
+  qty: z.number(),
+  line_total_cents: z.number(),
+  available: z.number(),
+});
+export type CartItem = z.infer<typeof cartItemSchema>;
+
+export const cartSchema = z.object({
+  id: z.string(),
+  currency: z.string(),
+  item_count: z.number(),
+  subtotal_cents: z.number(),
+  items: z.array(cartItemSchema),
+});
+export type Cart = z.infer<typeof cartSchema>;
+
+export interface AddCartItemInput {
+  variant_id: string;
+  qty: number;
+}
+
+/** Mock-only checkout simulation outcome (drives the X-Mock-Outcome header). */
+export type MockPaymentOutcome = 'succeeded' | 'failed' | 'out_of_stock';
+
+/* ---- Orders (§9.4 GET /orders · GET /orders/:id) ---- */
+export const orderStatusSchema = z.enum(['pending', 'paid', 'failed', 'cancelled', 'fulfilled']);
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+export const ORDER_STATUSES = orderStatusSchema.options;
+
+export const paymentStatusSchema = z.enum(['requires_payment', 'succeeded', 'failed']);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
+export const orderSummarySchema = z.object({
+  id: z.string(),
+  status: orderStatusSchema,
+  total_cents: z.number(),
+  currency: z.string(),
+  item_count: z.number(),
+  created_at: z.string(),
+});
+export type OrderSummary = z.infer<typeof orderSummarySchema>;
+export const orderListSchema = z.array(orderSummarySchema);
+
+export const orderItemSchema = z.object({
+  sku: z.string(),
+  name: z.string(),
+  unit_price_cents: z.number(),
+  qty: z.number(),
+  line_total_cents: z.number(),
+});
+export type OrderItem = z.infer<typeof orderItemSchema>;
+
+export const orderDetailSchema = z.object({
+  id: z.string(),
+  status: orderStatusSchema,
+  currency: z.string(),
+  subtotal_cents: z.number(),
+  total_cents: z.number(),
+  payment: z.object({
+    provider: z.string(),
+    status: paymentStatusSchema,
+  }),
+  items: z.array(orderItemSchema),
+  created_at: z.string(),
+});
+export type OrderDetail = z.infer<typeof orderDetailSchema>;
+
+export interface OrderListResult {
+  orders: OrderSummary[];
+  meta: PaginationMeta;
+}
