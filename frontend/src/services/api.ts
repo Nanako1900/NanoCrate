@@ -95,7 +95,15 @@ async function request<T>(path: string, options: RequestOptions<T>): Promise<Api
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      // Session cart (§9.2) may be cookie-based for guests; harmless for mock.
+      // Send credentials so the guest session cart cookie (§9.2) rides along.
+      // In mock mode this is same-origin and inert. In LIVE mode the API is a
+      // different origin (VITE_API_BASE_URL), so this is a *credentialed
+      // cross-origin* request and the backend MUST answer with a matching CORS
+      // contract or the browser drops the response:
+      //   Access-Control-Allow-Origin: <the exact storefront origin>  (never `*`)
+      //   Access-Control-Allow-Credentials: true
+      //   Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key
+      // Tracked as a backend.md §9.2 follow-up (contract owned by the backend).
       credentials: 'include',
       signal,
     });
@@ -232,23 +240,29 @@ export async function removeCartItem(itemId: string, signal?: AbortSignal): Prom
   return data;
 }
 
-/* ---- Checkout (§9.3). Idempotency-Key per call. ---- */
+/* ---- Checkout (§9.3). Idempotency-Key supplied by the caller. ---- */
 
 /**
+ * `idempotencyKey` is owned by the caller (the checkout hook), NOT minted here:
+ * one key per *logical* checkout attempt, reused across retries so a retried
+ * checkout replays the same order instead of creating a duplicate (§9.1, mirrors
+ * the backend's checkout saga). Minting a fresh UUID per call would defeat the
+ * header entirely — exactly the duplicate-order risk we're guarding against.
+ *
  * `mockOutcome` injects a mock-only `X-Mock-Outcome` header used by MSW to
  * simulate success / failure / out-of-stock. A real backend ignores it; the
  * real payment result is decided by Stripe + the webhook (SPEC §7).
  */
 export async function checkout(
   cartId: string,
-  options: { mockOutcome?: MockPaymentOutcome; signal?: AbortSignal } = {},
+  options: { idempotencyKey?: string; mockOutcome?: MockPaymentOutcome; signal?: AbortSignal } = {},
 ): Promise<CheckoutResponse> {
   const { data } = await request('/checkout', {
     method: 'POST',
     body: { cart_id: cartId },
     schema: checkoutResponseSchema,
     auth: true,
-    idempotencyKey: crypto.randomUUID(),
+    idempotencyKey: options.idempotencyKey,
     headers: options.mockOutcome ? { 'X-Mock-Outcome': options.mockOutcome } : undefined,
     signal: options.signal,
   });
