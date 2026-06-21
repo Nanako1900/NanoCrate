@@ -221,6 +221,38 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
 { "success": false, "data": null, "error": { "code": "out_of_stock", "message": "NANO75-RED-PBTW 库存不足" } }
 ```
 
+### 9.4 购物车与订单形状(Phase 2,mock 以此为准)
+
+```jsonc
+// GET /cart  ——  POST/PATCH/DELETE /cart/items 均返回同形状的「最新购物车」
+{ "success": true, "data": {
+    "id": "cart_01", "currency": "USD", "item_count": 2, "subtotal_cents": 25800,
+    "items": [
+      { "id": "ci_01", "variant_id": "v_01", "sku": "NANO75-RED-PBTW",
+        "name": "Nano75 · 75% / 红轴 / 白 PBT",
+        "unit_price_cents": 12900, "qty": 2, "line_total_cents": 25800, "available": 12 }
+    ] } }
+
+// GET /orders
+{ "success": true, "meta": { "total": 3, "page": 1, "limit": 20 },
+  "data": [ { "id": "o_01", "status": "paid", "total_cents": 25800, "currency": "USD",
+              "item_count": 2, "created_at": "2026-06-20T10:00:00Z" } ] }
+
+// GET /orders/:id  ——  order_items 为下单快照(价格/名称定格在购买时)
+{ "success": true, "data": {
+    "id": "o_01", "status": "paid", "currency": "USD",
+    "subtotal_cents": 25800, "total_cents": 25800,
+    "payment": { "provider": "stripe", "status": "succeeded" },
+    "items": [ { "sku": "NANO75-RED-PBTW", "name": "Nano75 · 75% / 红轴 / 白 PBT",
+                 "unit_price_cents": 12900, "qty": 2, "line_total_cents": 25800 } ],
+    "created_at": "2026-06-20T10:00:00Z" } }
+```
+
+- 订单 `status`:`pending | paid | failed | cancelled | fulfilled`
+- 支付 `payment.status`:`requires_payment | succeeded | failed`
+- 购物车增删改一律返回**最新购物车整体**(前端可直接替换缓存)
+- `POST /checkout` 成功返回 `{ order_id, client_secret }`(见 §9.3);**支付成败以 Stripe webhook 为准**(SPEC §7),前端结果页查订单状态判定
+
 ---
 
 ## 10. 鉴权(Keycloak)
