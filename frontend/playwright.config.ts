@@ -6,6 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // Visual-regression snapshots are OS/renderer-specific — run them on demand
+  // via `pnpm test:visual` so the functional e2e suite stays portable.
+  testIgnore: '**/visual.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

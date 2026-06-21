@@ -18,6 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
+    "test:visual": "playwright test e2e/visual.spec.ts",
     "mocks:init": "msw init public/ --save",
     "lint": "tsc --noEmit -p tsconfig.json"
   },
