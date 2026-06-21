@@ -4,6 +4,7 @@ import { useProductTypes } from '@/hooks/useProducts';
 import { useCart } from '@/hooks/useCart';
 import { useCartUI } from '@/components/cart/CartUIContext';
 import { useAuth } from '@/auth/AuthContext';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { cn } from '@/lib/cn';
 
 interface CategoryLinkProps {
@@ -218,6 +219,7 @@ export function SiteHeader() {
               <span className="sr-only">Search</span>
             </button>
           </form>
+          <ThemeToggle className="hidden sm:inline-flex" />
           <CartButton />
           <AccountMenu />
         </div>

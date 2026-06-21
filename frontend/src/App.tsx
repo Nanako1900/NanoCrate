@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { createQueryClient } from './services/query-client';
+import { ThemeProvider } from './components/theme/ThemeContext';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { CartUIProvider } from './components/cart/CartUIContext';
@@ -28,8 +29,9 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
           <CartUIProvider>
             <AppShell>
               <Routes>
@@ -77,8 +79,9 @@ export function App() {
               </Routes>
             </AppShell>
           </CartUIProvider>
-        </BrowserRouter>
-      </AuthProvider>
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

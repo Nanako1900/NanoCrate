@@ -111,11 +111,17 @@
 }
 
 @layer components {
-  /* Atmospheric blueprint grid — subtle texture for hero / banded surfaces. */
+  /* Atmospheric blueprint grid — subtle texture for hero / banded surfaces.
+     Line color + intensity are theme-tuned (dark dials the opacity down). */
   .bg-blueprint {
+    --_bp: color-mix(
+      in oklab,
+      var(--blueprint-line) calc(var(--blueprint-opacity) * 100%),
+      transparent
+    );
     background-image:
-      linear-gradient(to right, var(--line) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+      linear-gradient(to right, var(--_bp) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--_bp) 1px, transparent 1px);
     background-size: 2.25rem 2.25rem;
     background-position: center;
     -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 0%, #000 30%, transparent 78%);
