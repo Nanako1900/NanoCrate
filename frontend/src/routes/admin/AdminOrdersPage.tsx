@@ -60,6 +60,7 @@ export function AdminOrdersPage() {
         rows={data?.orders ?? []}
         rowKey={(o) => o.id}
         onRowClick={(o) => navigate(`/admin/orders/${o.id}`)}
+        rowLabel={(o) => `Open order ${o.id} for ${o.customer_email}`}
         loading={isLoading}
         error={isError ? error : undefined}
         onRetry={() => void refetch()}

@@ -36,6 +36,9 @@ interface DataTableProps<Row> {
   onSelectedChange?: (next: Set<string>) => void;
   rowActions?: (row: Row) => ReactNode;
   onRowClick?: (row: Row) => void;
+  /** Accessible name for a clickable row (required for keyboard users when
+   *  onRowClick is set and the row has no other keyboard-reachable control). */
+  rowLabel?: (row: Row) => string;
   loading?: boolean;
   /** Falsy = no error. Truthy renders the error state. */
   error?: unknown;
@@ -93,6 +96,7 @@ export function DataTable<Row>({
   onSelectedChange,
   rowActions,
   onRowClick,
+  rowLabel,
   loading = false,
   error,
   onRetry,
@@ -211,10 +215,24 @@ export function DataTable<Row>({
                 <tr
                   key={key}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  // Keyboard parity for the mouse row-click affordance.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={onRowClick ? rowLabel?.(row) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onRowClick(row);
+                          }
+                        }
+                      : undefined
+                  }
                   className={cn(
                     'border-b border-line/60 transition-colors last:border-0',
                     isSelected ? 'bg-interactive-soft' : 'hover:bg-surface-sunken',
-                    onRowClick && 'cursor-pointer',
+                    onRowClick &&
+                      'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-interactive',
                   )}
                 >
                   {selectable && (

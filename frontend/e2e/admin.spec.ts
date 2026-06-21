@@ -85,3 +85,14 @@ test('orders list opens an order with a status timeline', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Items/ })).toBeVisible();
 });
 
+test('order rows are keyboard-activatable (a11y)', async ({ page }) => {
+  await signInAsAdmin(page);
+  await page.getByRole('link', { name: 'Orders' }).click();
+  await expect(page.getByRole('heading', { name: 'Orders', level: 1 })).toBeVisible();
+  // Focus the first clickable row by its accessible name and activate with Enter.
+  const row = page.getByRole('row', { name: /Open order o_0\d/ }).first();
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/admin\/orders\/o_/);
+});
+

@@ -171,6 +171,7 @@ export function AdminProductsPage() {
         selected={selected}
         onSelectedChange={setSelected}
         onRowClick={(p) => navigate(`/admin/products/${p.id}`)}
+        rowLabel={(p) => `Edit ${p.name}`}
         rowActions={(p) => (
           <>
             <IconButton label={`Edit ${p.name}`} size="sm" onClick={() => navigate(`/admin/products/${p.id}`)}>

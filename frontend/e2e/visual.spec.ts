@@ -17,7 +17,7 @@ async function settle(page: Page) {
 const SNAP = { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.02 } as const;
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`storefront home — ${theme}`, async ({ page }) => {
+  test(`storefront home — ${theme} @visual`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('nanocrate-theme', t), theme);
     await page.goto('/');
     await expect(page.getByRole('link', { name: /nano75/i }).first()).toBeVisible();
@@ -25,7 +25,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page).toHaveScreenshot(`home-${theme}.png`, SNAP);
   });
 
-  test(`storefront product — ${theme}`, async ({ page }) => {
+  test(`storefront product — ${theme} @visual`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('nanocrate-theme', t), theme);
     await page.goto('/p/nano75');
     await expect(page.getByRole('button', { name: 'Add to cart' })).toBeVisible();
@@ -34,7 +34,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('admin console — both themes', async ({ page }) => {
+test('admin console — both themes @visual', async ({ page }) => {
   await page.goto('/admin');
   await page.getByRole('button', { name: /sign in as admin/i }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
