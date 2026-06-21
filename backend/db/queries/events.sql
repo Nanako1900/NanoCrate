@@ -11,8 +11,14 @@ LIMIT $1;
 -- name: MarkOutboxPublished :exec
 UPDATE outbox SET published_at = now() WHERE id = $1;
 
+-- name: IsEventConsumed :one
+-- 去重门:该 (consumer,event_id) 是否已消费。处理前查,已消费则跳过。
+SELECT EXISTS(
+    SELECT 1 FROM consumed_events WHERE consumer = $1 AND event_id = $2
+)::bool;
+
 -- name: MarkEventConsumed :execrows
--- 幂等消费:首个消费者写 1 行;重复投递写 0 行(已消费,跳过)。
+-- 处理成功/进 DLQ 后落标(幂等):首次写 1 行;重复写 0 行。
 INSERT INTO consumed_events (consumer, event_id) VALUES ($1, $2)
 ON CONFLICT (consumer, event_id) DO NOTHING;
 

@@ -52,6 +52,25 @@ func (q *Queries) InsertDeadLetter(ctx context.Context, arg InsertDeadLetterPara
 	return err
 }
 
+const isEventConsumed = `-- name: IsEventConsumed :one
+SELECT EXISTS(
+    SELECT 1 FROM consumed_events WHERE consumer = $1 AND event_id = $2
+)::bool
+`
+
+type IsEventConsumedParams struct {
+	Consumer string `json:"consumer"`
+	EventID  string `json:"event_id"`
+}
+
+// 去重门:该 (consumer,event_id) 是否已消费。处理前查,已消费则跳过。
+func (q *Queries) IsEventConsumed(ctx context.Context, arg IsEventConsumedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isEventConsumed, arg.Consumer, arg.EventID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listDeadLetters = `-- name: ListDeadLetters :many
 SELECT id, consumer, event_id, subject, event_type, payload, error, attempts, created_at
 FROM dead_letters
@@ -151,7 +170,7 @@ type MarkEventConsumedParams struct {
 	EventID  string `json:"event_id"`
 }
 
-// 幂等消费:首个消费者写 1 行;重复投递写 0 行(已消费,跳过)。
+// 处理成功/进 DLQ 后落标(幂等):首次写 1 行;重复写 0 行。
 func (q *Queries) MarkEventConsumed(ctx context.Context, arg MarkEventConsumedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markEventConsumed, arg.Consumer, arg.EventID)
 	if err != nil {
