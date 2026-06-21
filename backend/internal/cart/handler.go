@@ -138,6 +138,14 @@ func (h *Handler) resolve(c *gin.Context) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	if setCookie != uuid.Nil {
+		// B8 (adjudicated): keep SameSite=Lax, not Strict. The cookie is HttpOnly
+		// (and Secure outside dev), so it cannot be read by JS. Strict would drop
+		// the cookie on top-level cross-site navigations (arriving at the store via
+		// an email/ad/social link), making the guest cart appear empty — bad UX for
+		// a cart. It also gains little: guest-cart checkout additionally requires
+		// the user's JWT (RequireUser), so the cookie cannot be used to force a
+		// cross-site checkout regardless of SameSite. Lax sends it on top-level GET
+		// navigations, which is exactly what a cart needs.
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie(CookieName, setCookie.String(), cartCookieMaxAge, "/", "", h.secureCookies, true)
 	}
