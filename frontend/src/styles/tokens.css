@@ -1,0 +1,105 @@
+/*
+ * NanoCrate design tokens — single source of truth.
+ * Direction: "Industrial spec-sheet / technical editorial" for a mechanical
+ * keyboard store. Warm paper light base (NOT default dark mode), near-black
+ * warm ink, a confident amber accent (tactile/clicky warmth) + a steel-blue
+ * interactive accent, with monospace reserved for technical data.
+ *
+ * Tailwind utilities map onto these in global.css via `@theme inline`.
+ * Never hardcode palette / type / spacing in components — reference tokens.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Color · surfaces (warm paper, layered for tactile depth) ---- */
+  --paper: oklch(95.5% 0.011 80); /* page background — warm bone */
+  --surface: oklch(98.4% 0.007 85); /* raised cards / panels */
+  --surface-sunken: oklch(92.5% 0.014 76); /* recessed wells, tracks */
+  --surface-invert: oklch(24% 0.018 62); /* dark blocks for contrast accents */
+
+  /* ---- Color · ink (text) ---- */
+  --ink: oklch(23% 0.018 62); /* primary text — warm near-black */
+  --ink-soft: oklch(44% 0.018 66); /* secondary text */
+  --ink-faint: oklch(49% 0.016 68); /* labels / meta / placeholders — WCAG AA (>=5:1 on all surfaces) */
+  --ink-invert: oklch(96% 0.008 85); /* text on dark surfaces */
+
+  /* ---- Color · structure ---- */
+  --line: oklch(86% 0.018 78); /* hairline keylines / borders */
+  --line-strong: oklch(78% 0.02 74); /* emphasized dividers */
+
+  /* ---- Color · accent (amber — tactile warmth, primary brand) ---- */
+  --accent: oklch(72% 0.155 62);
+  --accent-strong: oklch(64% 0.165 56); /* hover / pressed */
+  --accent-soft: oklch(93% 0.05 75); /* tinted backgrounds */
+  --accent-ink: oklch(24% 0.04 60); /* text on accent fills */
+
+  /* ---- Color · interactive (steel blue — links, focus, selection) ---- */
+  --interactive: oklch(52% 0.12 248);
+  --interactive-strong: oklch(45% 0.13 250);
+  --interactive-soft: oklch(94% 0.03 245);
+
+  /* ---- Color · semantic stock states (badge bg + accessible ink) ---- */
+  --stock-in: oklch(56% 0.12 150); /* in stock */
+  --stock-in-bg: oklch(93% 0.05 150);
+  --stock-in-ink: oklch(40% 0.11 150);
+  --stock-low: oklch(66% 0.15 68); /* low stock */
+  --stock-low-bg: oklch(94% 0.06 75);
+  --stock-low-ink: oklch(46% 0.12 58);
+  --stock-out: oklch(55% 0.19 25); /* out of stock */
+  --stock-out-bg: oklch(94% 0.045 25);
+  --stock-out-ink: oklch(46% 0.16 25);
+
+  /* ---- Typography · families ---- */
+  --font-display: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+
+  /* ---- Typography · fluid scale ---- */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: clamp(0.9375rem, 0.9rem + 0.18vw, 1.0625rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-2xl: clamp(1.6rem, 1.3rem + 1.3vw, 2.4rem);
+  --text-3xl: clamp(2.1rem, 1.5rem + 2.5vw, 3.4rem);
+  --text-hero: clamp(2.6rem, 1rem + 6.6vw, 5.75rem);
+
+  /* ---- Typography · weights / tracking ---- */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --tracking-tight: -0.02em;
+  --tracking-label: 0.08em; /* uppercase mono labels */
+
+  /* ---- Spacing · semantic rhythm ---- */
+  --space-gutter: clamp(1rem, 0.6rem + 1.8vw, 2.25rem);
+  --space-section: clamp(3rem, 2rem + 5vw, 7rem);
+  --max-content: 80rem; /* 1280px content cap */
+
+  /* ---- Radius ---- */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation (warm-tinted, tactile) ---- */
+  --shadow-sm: 0 1px 2px oklch(24% 0.02 60 / 0.07), 0 1px 1px oklch(24% 0.02 60 / 0.04);
+  --shadow-md: 0 2px 6px oklch(24% 0.02 60 / 0.07), 0 8px 18px oklch(24% 0.02 60 / 0.07);
+  --shadow-lift: 0 4px 10px oklch(24% 0.02 60 / 0.08), 0 18px 38px oklch(24% 0.02 60 / 0.14);
+  --shadow-inset: inset 0 1px 0 oklch(100% 0 0 / 0.6);
+
+  /* ---- Motion ---- */
+  --duration-fast: 140ms;
+  --duration-normal: 260ms;
+  --duration-slow: 440ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ---- Layering ---- */
+  --z-header: 50;
+  --z-overlay: 100;
+}

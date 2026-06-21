@@ -1,0 +1,150 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './typography.css';
+
+/*
+ * Map Tailwind utilities onto the design tokens (Tailwind v4 CSS-first config).
+ * `inline` keeps the var() reference in generated utilities so the runtime
+ * cascade resolves the actual token value — tokens.css stays the source of truth.
+ */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-invert: var(--surface-invert);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-invert: var(--ink-invert);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-interactive: var(--interactive);
+  --color-interactive-strong: var(--interactive-strong);
+  --color-interactive-soft: var(--interactive-soft);
+
+  --color-stock-in: var(--stock-in);
+  --color-stock-in-bg: var(--stock-in-bg);
+  --color-stock-in-ink: var(--stock-in-ink);
+  --color-stock-low: var(--stock-low);
+  --color-stock-low-bg: var(--stock-low-bg);
+  --color-stock-low-ink: var(--stock-low-ink);
+  --color-stock-out: var(--stock-out);
+  --color-stock-out-bg: var(--stock-out-bg);
+  --color-stock-out-ink: var(--stock-out-ink);
+
+  --font-sans: var(--font-display);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --text-2xs: var(--text-2xs);
+  --text-hero: var(--text-hero);
+  --text-3xl: var(--text-3xl);
+  --text-2xl: var(--text-2xl);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lift: var(--shadow-lift);
+
+  --ease-out-expo: var(--ease-out-expo);
+  --ease-out-back: var(--ease-out-back);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--paper);
+    color: var(--ink);
+  }
+
+  /* Visible, designed focus — steel-blue ring, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--interactive);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img,
+  picture,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  /* Atmospheric blueprint grid — subtle texture for hero / banded surfaces. */
+  .bg-blueprint {
+    background-image:
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+    background-size: 2.25rem 2.25rem;
+    background-position: center;
+    -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 0%, #000 30%, transparent 78%);
+    mask-image: radial-gradient(ellipse 120% 100% at 50% 0%, #000 30%, transparent 78%);
+  }
+
+  /* Content width container with fluid gutters. */
+  .container-page {
+    width: 100%;
+    max-width: var(--max-content);
+    margin-inline: auto;
+    padding-inline: var(--space-gutter);
+  }
+}
+
+@layer utilities {
+  .label-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Respect user motion preference globally (defense-in-depth alongside the hook). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
