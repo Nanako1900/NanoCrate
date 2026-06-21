@@ -32,7 +32,8 @@
   --accent: oklch(72% 0.155 62);
   --accent-strong: oklch(64% 0.165 56); /* hover / pressed */
   --accent-soft: oklch(93% 0.05 75); /* tinted backgrounds */
-  --accent-ink: oklch(24% 0.04 60); /* text on accent fills */
+  --accent-ink: oklch(24% 0.04 60); /* text on accent-soft tints (badges) */
+  --accent-on: oklch(24% 0.04 60); /* text on SOLID accent fills (buttons); = ink in warm, overridden to light indigo in admin */
 
   /* ---- Color · interactive (steel blue — links, focus, selection) ---- */
   --interactive: oklch(52% 0.12 248);
@@ -141,7 +142,8 @@
   --accent: oklch(78% 0.15 66);
   --accent-strong: oklch(83% 0.155 66); /* hover / pressed — brighter on dark */
   --accent-soft: oklch(32% 0.06 66); /* tinted fills */
-  --accent-ink: oklch(16% 0.03 60); /* text on accent fills (stays dark) */
+  --accent-ink: oklch(16% 0.03 60); /* text on accent-soft tints (badges) */
+  --accent-on: oklch(16% 0.03 60); /* text on SOLID accent fills; = ink in warm, overridden in admin */
 
   /* ---- Interactive (steel blue, lifted) ---- */
   --interactive: oklch(72% 0.12 246);

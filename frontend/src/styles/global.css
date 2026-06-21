@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import './tokens.css';
 @import './typography.css';
+@import './admin.css'; /* admin-scoped indigo re-skin ([data-surface=admin]) */
 
 /*
  * Map Tailwind utilities onto the design tokens (Tailwind v4 CSS-first config).
@@ -25,6 +26,7 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-on: var(--accent-on);
 
   --color-interactive: var(--interactive);
   --color-interactive-strong: var(--interactive-strong);

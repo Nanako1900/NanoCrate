@@ -31,7 +31,7 @@ export function AdminShell() {
       >
         Skip to content
       </a>
-      <div className="flex min-h-dvh bg-paper text-ink">
+      <div data-surface="admin" className="flex min-h-dvh bg-paper text-ink">
         <AdminSidebarRail />
         <AdminSidebarDrawer open={navOpen} onClose={() => setNavOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">

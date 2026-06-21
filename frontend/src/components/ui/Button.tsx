@@ -13,7 +13,7 @@ const BASE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-accent-ink shadow-sm hover:bg-accent-strong hover:shadow-md',
+  primary: 'bg-accent text-accent-on shadow-sm hover:bg-accent-strong hover:shadow-md',
   secondary: 'border border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-sunken',
   ghost: 'bg-transparent text-ink hover:bg-surface-sunken',
   danger: 'bg-stock-out text-paper shadow-sm hover:brightness-110 hover:shadow-md',

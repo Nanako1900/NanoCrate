@@ -11,7 +11,7 @@ const BASE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive';
 
 const VARIANTS: Record<IconButtonVariant, string> = {
-  solid: 'bg-accent text-accent-ink hover:bg-accent-strong',
+  solid: 'bg-accent text-accent-on hover:bg-accent-strong',
   outline: 'border border-line bg-surface text-ink-soft hover:border-line-strong hover:text-ink',
   ghost: 'bg-transparent text-ink-soft hover:bg-surface-sunken hover:text-ink',
   danger: 'bg-transparent text-ink-soft hover:bg-stock-out-bg hover:text-stock-out-ink',
