@@ -181,13 +181,28 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
 | GET | `/orders` | 用户 | 自己的订单列表 |
 | GET | `/orders/:id` | 用户 | 订单详情 |
 | POST | `/webhooks/stripe` | 签名 | Stripe 回调(幂等, 见 SPEC §7) |
-| GET | `/admin/orders` | admin | 全部订单 |
+| GET | `/admin/orders` | admin | 全部订单(`?status=&page=&limit=`) |
+| GET | `/admin/products` | admin | 商品列表(`?q=&status=&page=&limit=`) |
 | POST | `/admin/products` | admin | 建商品 |
 | PATCH | `/admin/products/:id` | admin | 改商品 |
-| DELETE | `/admin/products/:id` | admin | 归档商品 |
+| DELETE | `/admin/products/:id` | admin | 归档商品(软删:status=archived) |
+| GET | `/admin/product-types/:key` | admin | 品类 `attribute_schema`(动态表单真源) |
 | POST | `/admin/products/:id/variants` | admin | 加规格 |
 | PATCH | `/admin/variants/:id` | admin | 改规格 |
-| POST | `/admin/inventory/:variant_id/restock` | admin | 补货 `{qty}` |
+| POST | `/admin/inventory/:variant_id/restock` | admin | 补货 `{qty}` → 最新库存 |
+| GET | `/admin/inventory` | admin | 库存列表(`?low=true` 仅低库存) |
+| GET | `/admin/inventory/:variant_id/ledger` | admin | 库存台账流水 |
+
+### 9.2.1 CORS(凭证式跨源)
+
+前端 SPA 与 API 不同源,且使用 **Cookie(游客车)+ `Authorization` Bearer + `Idempotency-Key`**,故启用**凭证式 CORS**:
+
+- 来源白名单经 `CORS_ALLOWED_ORIGINS`(逗号分隔)配置;**命中才回 `Access-Control-Allow-Origin: <该具体源>`**(回显具体源,**绝不用 `*`**,因为带凭证时 `*` 非法)。
+- `Access-Control-Allow-Credentials: true`(放行 Cookie)。
+- `Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key, X-Request-ID`。
+- `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS`。
+- `Vary: Origin`(避免缓存串源);预检 `OPTIONS` 命中白名单时返回 `204`,未命中源不回 CORS 头(浏览器自然拒绝)。
+- 暴露:`Access-Control-Expose-Headers: X-Request-ID`。
 
 ### 9.3 关键端点样例(mock 以此为准)
 
@@ -219,6 +234,126 @@ make sqlc                                # db/queries/*.sql → 生成 Go 代码
 { "success": true, "data": { "order_id": "o_01", "client_secret": "pi_..._secret_..." } }
 // 缺货:
 { "success": false, "data": null, "error": { "code": "out_of_stock", "message": "NANO75-RED-PBTW 库存不足" } }
+// 车非 active(已结过账等)/ 行数量超上限:
+{ "success": false, "data": null, "error": { "code": "conflict", "message": "cart is no longer active" } }      // 409
+{ "success": false, "data": null, "error": { "code": "validation_failed", "message": "qty must be between 1 and 999" } } // 400
+```
+
+### 9.4 购物车 / 订单形状(Phase 2,已实现 · 记录在案)
+
+> 本节把已上线的 cart/order 形状写定(此前散见于代码注释「§9.4」)。**非破坏性**:仅记录现状,改动需同步前端。
+
+```jsonc
+// GET /api/v1/cart  (PATCH/POST/DELETE /cart/items 同样返回「最新整车」)
+{ "success": true, "data": {
+    "id": "c_01", "currency": "USD", "item_count": 3, "subtotal_cents": 38700,
+    "items": [ { "id": "ci_01", "variant_id": "v_01", "sku": "NANO75-RED-PBTW",
+                 "name": "Nano75 · 75% / 红轴 / 白 PBT", "unit_price_cents": 12900,
+                 "qty": 3, "line_total_cents": 38700, "available": 12 } ] } }
+
+// GET /api/v1/orders?page=1&limit=20
+{ "success": true, "meta": { "total": 4, "page": 1, "limit": 20 },
+  "data": [ { "id": "o_01", "status": "paid", "total_cents": 25800,
+              "currency": "USD", "item_count": 2, "created_at": "2026-06-21T10:00:00Z" } ] }
+
+// GET /api/v1/orders/:id
+{ "success": true, "data": {
+    "id": "o_01", "status": "paid", "currency": "USD",
+    "subtotal_cents": 25800, "total_cents": 25800, "created_at": "...",
+    "payment": { "provider": "stripe", "status": "succeeded" },
+    "items": [ { "sku": "NANO75-RED-PBTW", "name": "Nano75 · 75% / 红轴 / 白 PBT",
+                 "unit_price_cents": 12900, "qty": 2, "line_total_cents": 25800 } ] } }
+```
+
+### 9.5 管理后台契约(admin)⭐ 前端 mock 真源
+
+> 全部挂 `/api/v1/admin/*`,需 `Bearer` + realm role `admin`(否则 `401 unauthorized` / `403 forbidden`)。
+> 写入端点对 `attributes` 按所属 `product_type.attribute_schema` **动态校验**;失败 `422 validation_failed`,并在 `error.details[]` 定位字段。
+> **契约是合同:本节改动须先同步前端并标注,绝不单方改。**
+
+**动态属性 schema 形状**(`attribute_schema`,前端动态表单的真源):
+
+```jsonc
+// GET /api/v1/admin/product-types/keyboard
+{ "success": true, "data": {
+    "key": "keyboard", "name": "Keyboard",
+    "attribute_schema": { "fields": [
+      { "name": "layout",        "type": "select", "required": true,  "options": ["60%","75%","TKL","full"] },
+      { "name": "hot_swappable", "type": "bool",   "required": false },
+      { "name": "switches",      "type": "number", "required": false },
+      { "name": "notes",         "type": "text",   "required": false }
+    ] } } }
+// type ∈ text | number | bool | select;select 必带 options;required 缺省 false。
+```
+
+**商品列表 / 写入:**
+
+```jsonc
+// GET /api/v1/admin/products?q=nano&status=active&page=1&limit=20
+{ "success": true, "meta": { "total": 12, "page": 1, "limit": 20 },
+  "data": [ { "id": "p_01", "slug": "nano75", "name": "Nano75", "type": "keyboard",
+              "status": "active", "variant_count": 3,
+              "price_range_cents": { "min": 12900, "max": 15900 },
+              "total_available": 27 } ] }
+
+// POST /api/v1/admin/products
+// body: { "type": "keyboard", "slug": "nano75", "name": "Nano75",
+//         "description": "...", "status": "draft",
+//         "attributes": { "layout": "75%", "hot_swappable": true } }
+{ "success": true, "data": { "id": "p_01", "slug": "nano75", "name": "Nano75",
+    "type": "keyboard", "status": "draft", "description": "...",
+    "attributes": { "layout": "75%", "hot_swappable": true } } }
+
+// PATCH /api/v1/admin/products/:id   body: 任意可改字段(name/slug/description/status/attributes)
+// DELETE /api/v1/admin/products/:id  → 软删:status=archived,返回该商品
+// 动态校验失败:
+{ "success": false, "data": null, "error": { "code": "validation_failed",
+    "message": "attribute validation failed",
+    "details": [ { "field": "layout", "message": "must be one of [60% 75% TKL full]" },
+                 { "field": "switches", "message": "must be a number" } ] } }   // 422
+```
+
+**规格(variant)写入:**
+
+```jsonc
+// POST /api/v1/admin/products/:id/variants
+// body: { "sku": "NANO75-RED", "name": "75% / 红轴", "price_cents": 12900,
+//         "currency": "USD", "status": "active", "attributes": { "switch": "red" } }
+{ "success": true, "data": { "id": "v_01", "product_id": "p_01", "sku": "NANO75-RED",
+    "name": "75% / 红轴", "price_cents": 12900, "currency": "USD",
+    "status": "active", "attributes": { "switch": "red" }, "available": 0 } }
+
+// PATCH /api/v1/admin/variants/:id  body: 任意可改(sku/name/price_cents/status/attributes)
+```
+
+**库存(招牌的可视证据):**
+
+```jsonc
+// POST /api/v1/admin/inventory/:variant_id/restock   body: { "qty": 50 }
+{ "success": true, "data": { "variant_id": "v_01", "available": 77, "reserved": 3 } }
+
+// GET /api/v1/admin/inventory?low=true&threshold=5&page=1&limit=20
+{ "success": true, "meta": { "total": 2, "page": 1, "limit": 20 },
+  "data": [ { "variant_id": "v_01", "sku": "NANO75-RED", "product_name": "Nano75",
+              "available": 3, "reserved": 1 } ] }
+
+// GET /api/v1/admin/inventory/:variant_id/ledger?page=1&limit=50
+{ "success": true, "meta": { "total": 4, "page": 1, "limit": 50 },
+  "data": [ { "id": 12, "kind": "restock", "delta_available": 50, "delta_reserved": 0,
+              "reservation_id": null, "created_at": "2026-06-21T10:05:00Z" },
+            { "id": 9, "kind": "commit", "delta_available": 0, "delta_reserved": -2,
+              "reservation_id": "r_07", "created_at": "..." } ] }
+// kind ∈ reserve | commit | release | expire | restock。台账 append-only,可重算库存。
+```
+
+**订单(admin 复用 §9.4 形状 + 状态过滤):**
+
+```jsonc
+// GET /api/v1/admin/orders?status=paid&page=1&limit=20
+{ "success": true, "meta": { "total": 31, "page": 1, "limit": 20 },
+  "data": [ { "id": "o_01", "user_id": "kc-sub-123", "status": "paid",
+              "total_cents": 25800, "currency": "USD", "item_count": 2,
+              "created_at": "..." } ] }
 ```
 
 ---
