@@ -1,0 +1,10 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      // Keycloak silent SSO check (live mode only): relays the auth result to
+      // the main app window. See keycloak-js silentCheckSsoRedirectUri.
+      parent.postMessage(location.href, location.origin);
+    </script>
+  </body>
+</html>
