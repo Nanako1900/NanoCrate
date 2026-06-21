@@ -9,8 +9,10 @@ interface QtyStepperProps {
   label?: string;
 }
 
+// aria-disabled (not `disabled`) so the control keeps keyboard focus at the
+// bounds; pointer-events-none + opacity convey the disabled affordance visually.
 const btn =
-  'inline-flex h-9 w-9 items-center justify-center text-ink transition-[transform,background-color,color] duration-150 ease-out hover:bg-surface-sunken active:translate-y-px disabled:pointer-events-none disabled:opacity-40';
+  'inline-flex h-9 w-9 items-center justify-center text-ink transition-[transform,background-color,color] duration-150 ease-out hover:bg-surface-sunken active:translate-y-px aria-disabled:pointer-events-none aria-disabled:opacity-40';
 
 /** Accessible −/+ quantity stepper. 36px targets within a 44px-tall row. */
 export function QtyStepper({ qty, max, min = 1, onChange, disabled = false, label = 'Quantity' }: QtyStepperProps) {
@@ -22,8 +24,10 @@ export function QtyStepper({ qty, max, min = 1, onChange, disabled = false, labe
       <button
         type="button"
         className={cn(btn, 'rounded-l-md')}
-        onClick={() => onChange(qty - 1)}
-        disabled={!canDec}
+        // Guard to a no-op at the bound: the button stays focusable (no `disabled`)
+        // so keyboard focus isn't dropped when you hit min/max.
+        onClick={() => canDec && onChange(qty - 1)}
+        aria-disabled={!canDec}
         aria-label={`Decrease ${label.toLowerCase()}`}
       >
         <span aria-hidden="true">−</span>
@@ -39,8 +43,8 @@ export function QtyStepper({ qty, max, min = 1, onChange, disabled = false, labe
       <button
         type="button"
         className={cn(btn, 'rounded-r-md')}
-        onClick={() => onChange(qty + 1)}
-        disabled={!canInc}
+        onClick={() => canInc && onChange(qty + 1)}
+        aria-disabled={!canInc}
         aria-label={`Increase ${label.toLowerCase()}`}
       >
         <span aria-hidden="true">+</span>
