@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -14,10 +16,16 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
+	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	"github.com/Nanako1900/NanoCrate/backend/internal/catalog"
+	"github.com/Nanako1900/NanoCrate/backend/internal/checkout"
+	"github.com/Nanako1900/NanoCrate/backend/internal/inventory"
+	"github.com/Nanako1900/NanoCrate/backend/internal/order"
+	"github.com/Nanako1900/NanoCrate/backend/internal/payment"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/config"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/db"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/logging"
+	"github.com/Nanako1900/NanoCrate/backend/internal/platform/metrics"
 )
 
 func main() {
@@ -48,11 +56,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	repo := catalog.NewRepository(pool)
-	service := catalog.NewService(repo)
-	handler := catalog.NewHandler(service)
+	metricsRegistry := metrics.New()
 
-	router := newRouter(cfg, logger, pool, handler, verifier)
+	catalogHandler := catalog.NewHandler(catalog.NewService(catalog.NewRepository(pool)))
+	inventoryService := inventory.NewService(pool, metricsRegistry)
+	cartHandler := cart.NewHandler(cart.NewService(pool), cfg.AppEnv != "development")
+	orderHandler := order.NewHandler(order.NewService(pool))
+	checkoutHandler := checkout.NewHandler(checkout.NewService(pool, inventoryService, selectPaymentProvider(cfg, logger), metricsRegistry))
+
+	router := newRouter(apiDeps{
+		cfg:      cfg,
+		logger:   logger,
+		pool:     pool,
+		verifier: verifier,
+		metrics:  metricsRegistry,
+		catalog:  catalogHandler,
+		cart:     cartHandler,
+		order:    orderHandler,
+		checkout: checkoutHandler,
+	})
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
@@ -81,4 +103,27 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "error", err)
 	}
+}
+
+// selectPaymentProvider returns the Stripe provider when a secret key is
+// configured. Outside development it refuses to fall back to the Fake provider,
+// so a misconfigured production deployment cannot accept forgeable webhooks.
+func selectPaymentProvider(cfg config.Config, logger *slog.Logger) payment.Provider {
+	if cfg.StripeSecretKey != "" {
+		return payment.NewStripeProvider(cfg.StripeSecretKey, cfg.StripeWebhookSecret)
+	}
+	if cfg.AppEnv != "development" {
+		logger.Error("STRIPE_SECRET_KEY is required outside development")
+		os.Exit(1)
+	}
+	// Development only: a random per-process HMAC key for the Fake provider's
+	// offline webhooks — never a known constant, so events cannot be forged.
+	logger.Warn("STRIPE_SECRET_KEY not set; using FakeProvider for payments (development only)")
+	return payment.NewFakeProvider(randomDevSecret())
+}
+
+func randomDevSecret() string {
+	buf := make([]byte, 24)
+	_, _ = rand.Read(buf) // development only; crypto/rand does not fail on supported platforms
+	return "whsec_dev_" + hex.EncodeToString(buf)
 }

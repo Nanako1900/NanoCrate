@@ -1,0 +1,9 @@
+-- 0003_commerce (down) — 逆序删除
+DROP TABLE IF EXISTS outbox;
+DROP TABLE IF EXISTS processed_events;
+DROP TABLE IF EXISTS stock_ledger;
+DROP TABLE IF EXISTS reservations;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS cart_items;
+DROP TABLE IF EXISTS carts;

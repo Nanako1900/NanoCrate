@@ -10,30 +10,60 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
+	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	"github.com/Nanako1900/NanoCrate/backend/internal/catalog"
+	"github.com/Nanako1900/NanoCrate/backend/internal/checkout"
+	"github.com/Nanako1900/NanoCrate/backend/internal/order"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/config"
+	"github.com/Nanako1900/NanoCrate/backend/internal/platform/metrics"
 	"github.com/Nanako1900/NanoCrate/backend/internal/platform/web"
 )
 
-// newRouter wires middleware, health probes, the public catalog slice, and the
-// auth-protected RBAC stubs (docs/backend.md §9.2).
-func newRouter(cfg config.Config, logger *slog.Logger, pool *pgxpool.Pool, catalogHandler *catalog.Handler, verifier *auth.Verifier) *gin.Engine {
-	if cfg.AppEnv != "development" {
+// apiDeps bundles everything the router wires together.
+type apiDeps struct {
+	cfg      config.Config
+	logger   *slog.Logger
+	pool     *pgxpool.Pool
+	verifier *auth.Verifier
+	metrics  *metrics.Registry
+	catalog  *catalog.Handler
+	cart     *cart.Handler
+	order    *order.Handler
+	checkout *checkout.Handler
+}
+
+// newRouter wires middleware, probes, metrics, and the public/session/user/admin
+// route groups (docs/backend.md §9.2).
+func newRouter(d apiDeps) *gin.Engine {
+	if d.cfg.AppEnv != "development" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	r := gin.New()
-	r.Use(web.RequestID(), web.Logger(logger), web.Recovery(logger))
+	r.Use(web.RequestID(), web.Logger(d.logger), web.Recovery(d.logger))
 
 	r.GET("/healthz", healthz)
-	r.GET("/readyz", readyz(pool))
+	r.GET("/readyz", readyz(d.pool))
+	r.GET("/metrics", d.metrics.Handler())
 
 	v1 := r.Group("/api/v1")
-	catalogHandler.Register(v1)
 
-	// Protected RBAC stubs (deep authorization lands in Phase 2).
-	v1.GET("/me", verifier.RequireUser(), me)
-	v1.GET("/admin/ping", verifier.RequireUser(), verifier.RequireRole("admin"), adminPing)
+	// Public: catalog + Stripe webhook (signature-authenticated).
+	d.catalog.Register(v1)
+	d.checkout.RegisterWebhook(v1)
+
+	// Session: cart works for guests (cookie) or logged-in users (JWT).
+	session := v1.Group("", d.verifier.OptionalUser())
+	d.cart.Register(session)
+
+	// User: checkout + orders require a valid token.
+	user := v1.Group("", d.verifier.RequireUser())
+	d.checkout.RegisterCheckout(user)
+	d.order.Register(user)
+	user.GET("/me", me)
+
+	// Admin RBAC stub.
+	v1.GET("/admin/ping", d.verifier.RequireUser(), d.verifier.RequireRole("admin"), adminPing)
 
 	return r
 }
