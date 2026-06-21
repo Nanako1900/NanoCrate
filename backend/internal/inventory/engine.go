@@ -69,8 +69,14 @@ func commit(ctx context.Context, q *invdb.Queries, reservationID uuid.UUID) erro
 	if rows == 0 {
 		return ErrReservationNotHeld
 	}
-	if _, err := q.CommitReservedStock(ctx, invdb.CommitReservedStockParams{VariantID: res.VariantID, Reserved: res.Qty}); err != nil {
+	affected, err := q.CommitReservedStock(ctx, invdb.CommitReservedStockParams{VariantID: res.VariantID, Reserved: res.Qty})
+	if err != nil {
 		return fmt.Errorf("commit stock: %w", err)
+	}
+	if affected != 1 {
+		// reserved < qty: conservation is broken. Fail hard so the tx rolls back
+		// instead of writing a ledger entry that would never reconcile.
+		return fmt.Errorf("commit stock variant %s qty %d: %w", res.VariantID, res.Qty, ErrStockConservation)
 	}
 	return q.InsertLedger(ctx, invdb.InsertLedgerParams{
 		VariantID:      res.VariantID,
@@ -95,8 +101,13 @@ func release(ctx context.Context, q *invdb.Queries, reservationID uuid.UUID, sta
 	if rows == 0 {
 		return ErrReservationNotHeld
 	}
-	if _, err := q.ReleaseReservedStock(ctx, invdb.ReleaseReservedStockParams{VariantID: res.VariantID, Available: res.Qty}); err != nil {
+	affected, err := q.ReleaseReservedStock(ctx, invdb.ReleaseReservedStockParams{VariantID: res.VariantID, Available: res.Qty})
+	if err != nil {
 		return fmt.Errorf("release stock: %w", err)
+	}
+	if affected != 1 {
+		// reserved < qty: conservation is broken. Fail hard so the tx rolls back.
+		return fmt.Errorf("release stock variant %s qty %d: %w", res.VariantID, res.Qty, ErrStockConservation)
 	}
 	return q.InsertLedger(ctx, invdb.InsertLedgerParams{
 		VariantID:      res.VariantID,
