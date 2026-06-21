@@ -34,11 +34,19 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+test('storefront semantic search @visual', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('nanocrate-theme', 'light'));
+  await page.goto('/search?q=quiet office full-size hot-swappable');
+  await expect(page.locator('ol li a[href^="/p/"]').first()).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot('search-light.png', SNAP);
+});
+
 test('admin console — both themes @visual', async ({ page }) => {
   await page.goto('/admin');
-  await page.getByRole('button', { name: /sign in as admin/i }).click();
-  await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
-  await expect(page.getByText('Stock conflicts')).toBeVisible();
+  await page.getByRole('button', { name: /以管理员登录/ }).click();
+  await expect(page.getByRole('heading', { name: '仪表盘', level: 1 })).toBeVisible();
+  await expect(page.getByText('库存冲突')).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot('admin-dashboard-light.png', SNAP);
 
@@ -49,8 +57,8 @@ test('admin console — both themes @visual', async ({ page }) => {
   await expect(page).toHaveScreenshot('admin-dashboard-dark.png', SNAP);
 
   // Products table in dark.
-  await page.getByRole('link', { name: 'Products' }).click();
-  await expect(page.getByRole('heading', { name: 'Products', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: '商品' }).click();
+  await expect(page.getByRole('heading', { name: '商品', level: 1 })).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot('admin-products-dark.png', SNAP);
 });

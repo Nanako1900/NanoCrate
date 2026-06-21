@@ -7,6 +7,20 @@ mocks that mirror the backend contract, so no backend is required to run it.
 > Contract source of truth: [`../docs/backend.md` §9](../docs/backend.md). UI conventions:
 > [`../docs/frontend.md`](../docs/frontend.md).
 
+**▶ Live demo:** _coming soon_ — `https://<live-demo-url>` _(static deploy, mock mode; replace when published)._
+
+### Screenshots
+
+| Storefront (light) | Storefront (dark) |
+|---|---|
+| ![Catalog, light](e2e/visual.spec.ts-snapshots/home-light-chromium-darwin.png) | ![Catalog, dark](e2e/visual.spec.ts-snapshots/home-dark-chromium-darwin.png) |
+
+| Semantic search | Admin console (indigo, 简体中文) |
+|---|---|
+| ![Search](e2e/visual.spec.ts-snapshots/search-light-chromium-darwin.png) | ![Admin dashboard](e2e/visual.spec.ts-snapshots/admin-dashboard-light-chromium-darwin.png) |
+
+_These are the committed visual-regression baselines (`pnpm test:visual`), captured at 320–1440 across both themes._
+
 ## Phase 1 scope
 
 Skeleton + product catalog (mock-first):
@@ -46,6 +60,26 @@ In **mock mode** there is no Stripe or Keycloak server, so:
 
 A real end-to-end payment requires **live mode + a backend + a Stripe test publishable key** — set
 `VITE_API_MODE=live`, `VITE_STRIPE_PUBLISHABLE_KEY`, and the `VITE_KEYCLOAK_*` vars (see `.env.example`).
+
+## Phase 3b scope — admin console + dark theme + component library
+
+- **Dark theme**: a full `[data-theme="dark"]` token set (warm charcoal); `ThemeProvider` resolves
+  light/dark/system, persists only the **UI preference** (never the token), honors
+  `prefers-color-scheme`, with a no-FOUC pre-paint script. **Both themes are WCAG-AA verified.**
+- **Component library** (`src/components/ui/`): Spinner, Button (+danger/loading), IconButton,
+  FormField + Input/Select/Textarea/Checkbox, Modal/ConfirmDialog (focus-trapped), Toast (aria-live),
+  DataTable (sort/bulk/row-actions/keyboard rows), Tabs — all states, steel-blue focus, token-only.
+- **Admin console** (`/admin`, **简体中文**, scoped Stripe-**indigo** skin): RBAC gate (`AdminRoute`),
+  sidebar/topbar shell, **⌘K command palette**, Dashboard (KPIs incl. a **stock-conflict** metric +
+  token-themed SVG charts), Products with a **★ schema-driven dynamic attribute form** + **★ variant/SKU
+  matrix editor**, Inventory with an **★ append-only stock ledger**, and Orders with a status timeline.
+  Aligned to **`docs/backend.md` §9.5**; admin code is lazy-loaded off the storefront landing bundle.
+
+## Phase 4 scope — semantic search
+
+- `/search?q=` runs a semantic + keyword hybrid search (`POST /search`, §9.3) with relevance-ranked
+  results, loading/empty/error states, and example-driven suggestions; the header search submits here.
+  The mock expands natural-language terms through an attribute synonym map for a demoable ranking.
 
 ## Design direction
 
@@ -91,7 +125,8 @@ VITE_KEYCLOAK_CLIENT_ID=storefront
 | `pnpm typecheck` | `tsc --noEmit` for app + config |
 | `pnpm test` | Vitest unit/integration (runs against MSW) |
 | `pnpm test:coverage` | Vitest with coverage |
-| `pnpm test:e2e` | Playwright smoke (mock mode, deterministic) |
+| `pnpm test:e2e` | Playwright functional e2e (mock mode, deterministic; excludes `@visual`) |
+| `pnpm test:visual` | Playwright visual-regression baselines (`@visual`; platform-specific) |
 | `pnpm test:e2e:install` | Install the Playwright browser |
 | `node scripts/generate-images.mjs` | Regenerate SVG product placeholders |
 | `node scripts/screenshots-phase2.mjs` | Drive the purchase flow + capture breakpoint screenshots |

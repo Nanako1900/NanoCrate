@@ -19,6 +19,7 @@
     "test:e2e": "playwright test --grep-invert @visual",
     "test:e2e:install": "playwright install chromium",
     "test:visual": "playwright test --grep @visual",
+    "budget": "node scripts/check-budget.mjs",
     "mocks:init": "msw init public/ --save",
     "lint": "tsc --noEmit -p tsconfig.json"
   },

@@ -1,0 +1,64 @@
+name: frontend-ci
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  quality:
+    name: typecheck · test · build · budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          # pnpm 11 ships supply-chain defaults that block CI; relax them here.
+          pnpm config set minimumReleaseAge 0
+          pnpm config set verifyDepsBeforeRun false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm budget
+
+  e2e:
+    name: e2e (functional + visual)
+    runs-on: ubuntu-latest
+    # The Playwright image pins the browser + OS so the committed *-linux visual
+    # baselines render identically in CI.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.0-jammy
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          pnpm config set minimumReleaseAge 0
+          pnpm config set verifyDepsBeforeRun false
+      - run: pnpm install --frozen-lockfile
+      - name: Functional e2e (mock mode)
+        run: pnpm test:e2e
+      - name: Visual regression
+        run: pnpm test:visual
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
