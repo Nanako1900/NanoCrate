@@ -77,7 +77,7 @@ export function AdminProductEditorPage() {
     const nameInvalid = !name.trim();
     const fieldErrors = validateAttributeValues(schema, attrValues);
     setErrors(fieldErrors);
-    if (nameInvalid) setFormError('Product name is required.');
+    if (nameInvalid) setFormError('商品名称为必填。');
     if (nameInvalid || Object.keys(fieldErrors).length > 0) {
       focusFirstError(fieldErrors, nameInvalid);
       return;
@@ -86,10 +86,10 @@ export function AdminProductEditorPage() {
     try {
       if (isEdit) {
         await updateProduct.mutateAsync(payload);
-        toast({ tone: 'success', title: 'Product saved' });
+        toast({ tone: 'success', title: '已保存' });
       } else {
         const created = await createProduct.mutateAsync(payload);
-        toast({ tone: 'success', title: 'Product created', description: 'Now add variants and SKUs.' });
+        toast({ tone: 'success', title: '商品已创建', description: '现在可添加规格与 SKU。' });
         navigate(`/admin/products/${created.id}`);
       }
     } catch (e) {
@@ -100,9 +100,9 @@ export function AdminProductEditorPage() {
         for (const d of e.details) mapped[d.field] = d.message;
         setErrors(mapped);
         focusFirstError(mapped, Boolean(mapped.name));
-        setFormError('Please fix the highlighted fields.');
+        setFormError('请修正高亮的字段。');
       } else {
-        setFormError(e instanceof ApiError ? e.message : 'Could not save the product.');
+        setFormError(e instanceof ApiError ? e.message : '保存商品失败。');
       }
     }
   }
@@ -110,7 +110,7 @@ export function AdminProductEditorPage() {
   if (isEdit && productQuery.isError) {
     return (
       <>
-        <AdminPageHeader breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Products', to: '/admin/products' }, { label: 'Edit' }]} title="Edit product" />
+        <AdminPageHeader breadcrumbs={[{ label: '后台', to: '/admin' }, { label: '商品', to: '/admin/products' }, { label: '编辑' }]} title="编辑商品" />
         <ErrorState error={productQuery.error} onRetry={() => void productQuery.refetch()} />
       </>
     );
@@ -121,15 +121,15 @@ export function AdminProductEditorPage() {
   return (
     <>
       <AdminPageHeader
-        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Products', to: '/admin/products' }, { label: isEdit ? name || 'Edit' : 'New product' }]}
-        title={isEdit ? 'Edit product' : 'New product'}
+        breadcrumbs={[{ label: '后台', to: '/admin' }, { label: '商品', to: '/admin/products' }, { label: isEdit ? name || '编辑' : '新建商品' }]}
+        title={isEdit ? '编辑商品' : '新建商品'}
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={() => navigate('/admin/products')} disabled={pending}>
-              Cancel
+              取消
             </Button>
             <Button size="sm" onClick={submit} loading={pending}>
-              {isEdit ? 'Save changes' : 'Create product'}
+              {isEdit ? '保存修改' : '创建商品'}
             </Button>
           </>
         }
@@ -143,14 +143,14 @@ export function AdminProductEditorPage() {
         )}
 
         <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Details</h2>
+          <h2 className="mb-4 text-sm font-semibold text-ink">基本信息</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Name" htmlFor="product-name" required className="sm:col-span-2" error={!name.trim() && formError ? 'Product name is required.' : undefined}>
-              <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nano75" />
+            <FormField label="名称" htmlFor="product-name" required className="sm:col-span-2" error={!name.trim() && formError ? '商品名称为必填。' : undefined}>
+              <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如:Nano75" />
             </FormField>
-            <FormField label="Type" required>
+            <FormField label="类型" required>
               <Select value={type} onChange={(e) => onTypeChange(e.target.value)} disabled={isEdit && !loadedRef.current}>
-                <option value="">Select…</option>
+                <option value="">请选择…</option>
                 {typesQuery.data?.map((t) => (
                   <option key={t.key} value={t.key}>
                     {t.name}
@@ -158,28 +158,28 @@ export function AdminProductEditorPage() {
                 ))}
               </Select>
             </FormField>
-            <FormField label="Status">
+            <FormField label="状态">
               <Select value={status} onChange={(e) => setStatus(e.target.value as ProductStatus)}>
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
+                <option value="draft">草稿</option>
+                <option value="active">上架</option>
+                <option value="archived">已归档</option>
               </Select>
             </FormField>
-            <FormField label="Description" className="sm:col-span-2">
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="A 75% gasket-mounted board…" />
+            <FormField label="描述" className="sm:col-span-2">
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="例如:75% 垫片定位…" />
             </FormField>
           </div>
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5">
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold text-ink">Attributes</h2>
-            {type && <span className="label-mono normal-case text-ink-faint">from {type} schema</span>}
+            <h2 className="text-sm font-semibold text-ink">属性</h2>
+            {type && <span className="label-mono normal-case text-ink-faint">来自 {type} 模板</span>}
           </div>
           {type ? (
             <DynamicAttributeForm schema={schema} values={attrValues} errors={errors} onChange={(n, v) => setAttrValues((prev) => ({ ...prev, [n]: v }))} disabled={pending} />
           ) : (
-            <p className="text-sm text-ink-faint">Select a product type to configure its attributes.</p>
+            <p className="text-sm text-ink-faint">请先选择商品类型以配置其属性。</p>
           )}
         </section>
 

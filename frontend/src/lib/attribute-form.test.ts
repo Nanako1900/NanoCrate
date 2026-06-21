@@ -28,15 +28,15 @@ describe('attribute-form', () => {
 
   it('flags missing required fields, located by name', () => {
     const errors = validateAttributeValues(schema, emptyAttributeValues(schema));
-    expect(errors.layout).toMatch(/required/i);
-    expect(errors.actuation_g).toMatch(/required/i);
+    expect(errors.layout).toMatch(/为必填/);
+    expect(errors.actuation_g).toMatch(/为必填/);
     expect(errors.hot_swappable).toBeUndefined(); // bool is always present
   });
 
   it('rejects a non-numeric number and an off-list select', () => {
     const errors = validateAttributeValues(schema, { layout: 'NOPE', actuation_g: 'abc', hot_swappable: false, note: '' });
-    expect(errors.actuation_g).toMatch(/number/i);
-    expect(errors.layout).toMatch(/valid/i);
+    expect(errors.actuation_g).toMatch(/必须为数字/);
+    expect(errors.layout).toMatch(/请选择有效/);
   });
 
   it('coerces to typed attributes and omits empty optionals', () => {

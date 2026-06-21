@@ -22,14 +22,14 @@ async function expectNoOverflowAcrossWidths(page: Page, context: string) {
 test('admin pages: no overflow 320–1440', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/admin');
-  await page.getByRole('button', { name: /sign in as admin/i }).click();
-  await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /以管理员登录/ }).click();
+  await expect(page.getByRole('heading', { name: '仪表盘', level: 1 })).toBeVisible();
   await expectNoOverflowAcrossWidths(page, 'admin/dashboard');
 
-  for (const name of ['Products', 'Inventory', 'Orders', 'Settings'] as const) {
+  for (const name of ['商品', '库存', '订单', '设置'] as const) {
     await page.getByRole('link', { name }).click();
     await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
-    await expectNoOverflowAcrossWidths(page, `admin/${name.toLowerCase()}`);
+    await expectNoOverflowAcrossWidths(page, `admin/${name}`);
   }
 });
 

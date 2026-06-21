@@ -26,7 +26,7 @@ function NavCount({ kind }: { kind: 'low_stock' | 'orders' }) {
 /** The nav list — shared by the desktop rail and the mobile drawer. */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav aria-label="Admin sections" className="flex flex-col gap-0.5 p-3">
+    <nav aria-label="后台导航" className="flex flex-col gap-0.5 p-3">
       {ADMIN_NAV.map((item) => {
         const Icon = item.icon;
         return (
@@ -61,7 +61,7 @@ function Brand() {
       <span className="flex h-7 w-7 items-center justify-center rounded bg-ink font-mono text-sm font-bold text-ink-invert">N</span>
       <span className="flex flex-col leading-none">
         <span className="text-sm font-semibold tracking-tight text-ink">NanoCrate</span>
-        <span className="label-mono mt-0.5 text-2xs text-ink-faint">// admin</span>
+        <span className="label-mono mt-0.5 text-2xs text-ink-faint">// 后台</span>
       </span>
     </Link>
   );
@@ -76,7 +76,7 @@ export function AdminSidebarRail() {
         <div className="border-t border-line" />
         <SidebarNav />
         <p className="mt-auto px-4 py-4 text-2xs text-ink-faint">
-          Mock data · proposed §9.5
+          模拟数据 · §9.5(提案)
         </p>
       </div>
     </aside>
@@ -141,7 +141,7 @@ export function AdminSidebarDrawer({ open, onClose }: { open: boolean; onClose: 
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Admin navigation"
+        aria-label="后台导航"
         className={cn(
           'fixed inset-y-0 left-0 z-[var(--z-overlay)] flex w-72 max-w-[80%] flex-col bg-surface shadow-lift transition-transform duration-300 ease-out-expo',
           open ? 'translate-x-0' : '-translate-x-full',
@@ -152,7 +152,7 @@ export function AdminSidebarDrawer({ open, onClose }: { open: boolean; onClose: 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close navigation"
+            aria-label="关闭导航"
             className="rounded-md p-2 text-ink-soft hover:bg-surface-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive"
           >
             <CloseIcon size={20} />

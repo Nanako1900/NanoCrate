@@ -39,15 +39,15 @@ export function validateAttributeValues(schema: AttributeSchema, values: Attribu
     // can be empty and thus fail a required check.
     const empty = field.type !== 'bool' && (value === '' || value === undefined || value === null);
     if (field.required && empty) {
-      errors[field.name] = `${label} is required.`;
+      errors[field.name] = `${label} 为必填。`;
       continue;
     }
     if (empty) continue;
     if (field.type === 'number' && !Number.isFinite(Number(value))) {
-      errors[field.name] = `${label} must be a number.`;
+      errors[field.name] = `${label} 必须为数字。`;
     }
     if (field.type === 'select' && field.options && !field.options.includes(String(value))) {
-      errors[field.name] = `Choose a valid ${label.toLowerCase()}.`;
+      errors[field.name] = `请选择有效的${label}。`;
     }
   }
   return errors;

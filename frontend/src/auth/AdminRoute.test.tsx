@@ -20,14 +20,14 @@ function renderGuarded() {
 describe('AdminRoute RBAC', () => {
   it('blocks anonymous visitors with a sign-in gate', () => {
     renderGuarded();
-    expect(screen.getByRole('heading', { name: 'Sign in to the console' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '登录管理后台' })).toBeInTheDocument();
     expect(screen.queryByText('Secret admin content')).toBeNull();
   });
 
   it('admins reach the content after signing in', async () => {
     const user = userEvent.setup();
     renderGuarded();
-    await user.click(screen.getByRole('button', { name: /sign in as admin/i }));
+    await user.click(screen.getByRole('button', { name: /以管理员登录/ }));
     expect(screen.getByRole('heading', { name: 'Secret admin content' })).toBeInTheDocument();
   });
 });

@@ -5,9 +5,9 @@ import { cn } from '@/lib/cn';
 import type { ThemePreference } from '@/lib/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
-  { value: 'system', label: 'System', hint: 'Match your OS setting' },
-  { value: 'light', label: 'Light', hint: 'Warm paper' },
-  { value: 'dark', label: 'Dark', hint: 'Warm charcoal' },
+  { value: 'system', label: '跟随系统', hint: '跟随系统设置' },
+  { value: 'light', label: '浅色', hint: '暖纸色' },
+  { value: 'dark', label: '深色', hint: '暖炭色' },
 ];
 
 function SettingsCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
@@ -26,15 +26,15 @@ export function AdminSettingsPage() {
   return (
     <>
       <AdminPageHeader
-        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Settings' }]}
-        title="Settings"
-        description="Console preferences for this device."
+        breadcrumbs={[{ label: '后台', to: '/admin' }, { label: '设置' }]}
+        title="设置"
+        description="本设备的控制台偏好。"
       />
       <div className="grid max-w-2xl gap-5">
-        <SettingsCard title="Appearance" description="Theme preference is stored on this device only — never your session token.">
+        <SettingsCard title="外观" description="主题偏好仅存于本设备 — 绝不存储会话令牌。">
           <fieldset>
-            <legend className="sr-only">Theme</legend>
-            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Theme">
+            <legend className="sr-only">主题</legend>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="主题">
               {THEME_OPTIONS.map((opt) => {
                 const selected = preference === opt.value;
                 return (
@@ -58,11 +58,11 @@ export function AdminSettingsPage() {
           </fieldset>
         </SettingsCard>
 
-        <SettingsCard title="Environment" description="Where this console is reading and writing data.">
+        <SettingsCard title="环境" description="本控制台读写数据的位置。">
           <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
-            <dt className="label-mono normal-case text-ink-faint">API mode</dt>
+            <dt className="label-mono normal-case text-ink-faint">API 模式</dt>
             <dd className="font-mono text-ink">{apiMode}</dd>
-            <dt className="label-mono normal-case text-ink-faint">Contract</dt>
+            <dt className="label-mono normal-case text-ink-faint">契约</dt>
             <dd className="font-mono text-ink">backend.md §9.5 (proposed)</dd>
           </dl>
         </SettingsCard>

@@ -12,9 +12,9 @@ export interface AdminNavItem {
 }
 
 export const ADMIN_NAV: AdminNavItem[] = [
-  { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
-  { to: '/admin/products', label: 'Products', icon: ProductsIcon },
-  { to: '/admin/inventory', label: 'Inventory', icon: InventoryIcon, count: 'low_stock' },
-  { to: '/admin/orders', label: 'Orders', icon: OrdersIcon, count: 'orders' },
-  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/admin', label: '仪表盘', icon: DashboardIcon, end: true },
+  { to: '/admin/products', label: '商品', icon: ProductsIcon },
+  { to: '/admin/inventory', label: '库存', icon: InventoryIcon, count: 'low_stock' },
+  { to: '/admin/orders', label: '订单', icon: OrdersIcon, count: 'orders' },
+  { to: '/admin/settings', label: '设置', icon: SettingsIcon },
 ];

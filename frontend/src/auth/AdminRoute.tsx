@@ -1,8 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Button } from '@/components/ui/Button';
-import { buttonClasses } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 
 function Gate({ children }: { children: ReactNode }) {
   return (
@@ -16,17 +15,30 @@ function Gate({ children }: { children: ReactNode }) {
 
 /**
  * Admin route guard (RBAC). Requires an authenticated session carrying the
- * `admin` role; otherwise renders a dedicated state — sign-in when anonymous,
- * a no-permission notice when signed in without the role.
+ * `admin` role; otherwise renders a dedicated state — sign-in when anonymous, a
+ * no-permission notice when signed in without the role. Also scopes the indigo
+ * admin skin + zh-CN language to the whole /admin tree (gate, lazy-shell load,
+ * and console), restoring the storefront warm/English on leave.
  */
 export function AdminRoute({ children }: { children: ReactNode }) {
   const { status, isAuthenticated, isAdmin, login, logout, mode, user } = useAuth();
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const prevLang = el.lang;
+    el.dataset.skin = 'admin';
+    el.lang = 'zh-CN';
+    return () => {
+      delete el.dataset.skin;
+      el.lang = prevLang || 'en';
+    };
+  }, []);
 
   if (status === 'loading') {
     return (
       <Gate>
         <p className="label-mono text-ink-faint" role="status">
-          Checking access…
+          正在校验权限…
         </p>
       </Gate>
     );
@@ -35,17 +47,17 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   if (!isAuthenticated) {
     return (
       <Gate>
-        <p className="label-mono text-2xs uppercase tracking-[0.08em] text-ink-faint">Admin · restricted</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">Sign in to the console</h1>
-        <p className="mt-2 text-ink-soft">The NanoCrate admin console requires an account with the admin role.</p>
+        <p className="label-mono text-2xs uppercase tracking-[0.08em] text-ink-faint">后台 · 受限</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">登录管理后台</h1>
+        <p className="mt-2 text-ink-soft">NanoCrate 管理后台需要具备 admin 角色的账户。</p>
         <Button onClick={() => login({ admin: true })} className="mt-5 w-full">
-          {mode === 'mock' ? 'Sign in as admin (demo)' : 'Sign in'}
+          {mode === 'mock' ? '以管理员登录(演示)' : '登录'}
         </Button>
         {mode === 'mock' && (
-          <p className="mt-3 text-2xs text-ink-faint">Mock mode · instant demo admin session, no real credentials.</p>
+          <p className="mt-3 text-2xs text-ink-faint">模拟模式 · 即时演示管理员会话,无需真实凭据。</p>
         )}
         <Link to="/" className="mt-4 inline-block text-sm text-interactive hover:underline">
-          ← Back to the store
+          ← 返回店面
         </Link>
       </Gate>
     );
@@ -60,26 +72,21 @@ export function AdminRoute({ children }: { children: ReactNode }) {
             <path d="M8 11V8a4 4 0 0 1 8 0v3" />
           </svg>
         </span>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink">No admin access</h1>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink">无后台权限</h1>
         <p className="mt-2 text-ink-soft">
-          You’re signed in as <span className="font-medium text-ink">{user?.email}</span>, which doesn’t have
-          the admin role. Switch to an admin account to continue.
+          当前登录为 <span className="font-medium text-ink">{user?.email}</span>,不具备 admin 角色。请切换到管理员账户继续。
         </p>
         <div className="mt-5 flex flex-col gap-2">
           {mode === 'mock' && (
             <Button onClick={() => login({ admin: true })} className="w-full">
-              Switch to admin (demo)
+              切换到管理员(演示)
             </Button>
           )}
-          <button
-            type="button"
-            onClick={logout}
-            className={buttonClasses('secondary', 'md', 'w-full')}
-          >
-            Sign out
+          <button type="button" onClick={logout} className={buttonClasses('secondary', 'md', 'w-full')}>
+            退出登录
           </button>
           <Link to="/" className="mt-1 text-sm text-interactive hover:underline">
-            ← Back to the store
+            ← 返回店面
           </Link>
         </div>
       </Gate>

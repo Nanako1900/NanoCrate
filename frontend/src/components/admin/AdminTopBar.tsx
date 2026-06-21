@@ -73,7 +73,7 @@ function AccountMenu() {
     <details ref={ref} className="relative">
       <summary
         className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong [&::-webkit-details-marker]:hidden"
-        aria-label="Account menu"
+        aria-label="账户菜单"
       >
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft font-mono text-2xs font-semibold text-accent-ink">
           {(user?.name ?? 'A').slice(0, 1)}
@@ -86,7 +86,7 @@ function AccountMenu() {
           {user?.email && <p className="label-mono mt-0.5 truncate normal-case">{user.email}</p>}
         </div>
         <Link to="/" onClick={close} className="block rounded-md px-2 py-2 text-sm text-ink transition-colors hover:bg-surface-sunken">
-          View store
+          查看店面
         </Link>
         <button
           type="button"
@@ -96,7 +96,7 @@ function AccountMenu() {
           }}
           className="block w-full rounded-md px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-sunken"
         >
-          Sign out
+          退出登录
         </button>
       </div>
     </details>
@@ -114,7 +114,7 @@ export function AdminTopBar({ onOpenNav, onOpenCommand }: AdminTopBarProps) {
       <button
         type="button"
         onClick={onOpenNav}
-        aria-label="Open navigation"
+        aria-label="打开导航"
         className="rounded-md p-2 text-ink-soft hover:bg-surface-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive lg:hidden"
       >
         <MenuIcon size={20} />
@@ -127,10 +127,10 @@ export function AdminTopBar({ onOpenNav, onOpenCommand }: AdminTopBarProps) {
           'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-3 text-left text-sm text-ink-faint',
           'transition-colors hover:border-line-strong sm:max-w-sm',
         )}
-        aria-label="Open command palette and search"
+        aria-label="打开命令面板并搜索"
       >
         <SearchIcon size={16} className="shrink-0" />
-        <span className="truncate">Search or jump to…</span>
+        <span className="truncate">搜索或跳转…</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-surface-sunken px-1.5 py-0.5 font-mono text-2xs text-ink-faint sm:inline">
           ⌘K
         </kbd>

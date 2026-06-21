@@ -2,36 +2,37 @@ import type { AttributeSchema } from '@/services/admin-types';
 
 /**
  * attribute_schema per product type — the source of the ★ dynamic attribute
- * form. Mirrors the attribute keys used in fixtures/products.ts so seeded
- * products validate against their own type. In live mode this comes from
- * product_type.attribute_schema (JSONB), per backend.md §7 / SPEC §5.
+ * form. §9.5 fields are lean { name, type, required?, options? }; `label`/`help`/
+ * `unit` here are OPTIONAL frontend display hints (Simplified Chinese for the
+ * zh-CN admin). A live backend may omit them, in which case the form derives a
+ * label from `name`. `name`/`options`/values stay as stored data (English).
  */
 export const ADMIN_ATTRIBUTE_SCHEMAS: Record<string, AttributeSchema> = {
   keyboard: {
     fields: [
-      { name: 'layout', label: 'Layout', type: 'select', required: true, options: ['60%', '65%', '75%', 'TKL', 'full', '1800', 'split', 'numpad'] },
-      { name: 'mount', label: 'Mount', type: 'select', required: true, options: ['gasket', 'top', 'tray'] },
-      { name: 'case', label: 'Case', type: 'select', required: false, options: ['aluminum', 'polycarbonate'] },
-      { name: 'connection', label: 'Connection', type: 'select', required: true, options: ['wired', 'wireless'] },
-      { name: 'hot_swappable', label: 'Hot-swappable', type: 'bool', required: false, help: 'Switches can be swapped without soldering.' },
-      { name: 'backlight', label: 'Backlight', type: 'select', required: false, options: ['none', 'white', 'rgb'] },
+      { name: 'layout', label: '布局', type: 'select', required: true, options: ['60%', '65%', '75%', 'TKL', 'full', '1800', 'split', 'numpad'] },
+      { name: 'mount', label: '定位结构', type: 'select', required: true, options: ['gasket', 'top', 'tray'] },
+      { name: 'case', label: '外壳', type: 'select', required: false, options: ['aluminum', 'polycarbonate'] },
+      { name: 'connection', label: '连接', type: 'select', required: true, options: ['wired', 'wireless'] },
+      { name: 'hot_swappable', label: '热插拔', type: 'bool', required: false, help: '无需焊接即可更换轴体。' },
+      { name: 'backlight', label: '背光', type: 'select', required: false, options: ['none', 'white', 'rgb'] },
     ],
   },
   keycaps: {
     fields: [
-      { name: 'profile', label: 'Profile', type: 'select', required: true, options: ['cherry', 'osa', 'sa', 'oem'] },
-      { name: 'material', label: 'Material', type: 'select', required: true, options: ['PBT', 'ABS'] },
-      { name: 'legends', label: 'Legends', type: 'select', required: false, options: ['dye-sub', 'doubleshot', 'blank'] },
-      { name: 'compatibility', label: 'Compatibility', type: 'select', required: true, options: ['mx', 'choc'] },
+      { name: 'profile', label: '键帽高度', type: 'select', required: true, options: ['cherry', 'osa', 'sa', 'oem'] },
+      { name: 'material', label: '材质', type: 'select', required: true, options: ['PBT', 'ABS'] },
+      { name: 'legends', label: '字符工艺', type: 'select', required: false, options: ['dye-sub', 'doubleshot', 'blank'] },
+      { name: 'compatibility', label: '兼容', type: 'select', required: true, options: ['mx', 'choc'] },
     ],
   },
   switches: {
     fields: [
-      { name: 'type', label: 'Type', type: 'select', required: true, options: ['linear', 'tactile', 'clicky'] },
-      { name: 'actuation_g', label: 'Actuation force', type: 'number', required: true, unit: 'g', placeholder: '45' },
-      { name: 'lubed', label: 'Factory lubed', type: 'bool', required: false },
-      { name: 'mount', label: 'Mount', type: 'select', required: false, options: ['plate', 'pcb'] },
-      { name: 'pack', label: 'Pack size', type: 'number', required: true, unit: 'pcs', placeholder: '70' },
+      { name: 'type', label: '类型', type: 'select', required: true, options: ['linear', 'tactile', 'clicky'] },
+      { name: 'actuation_g', label: '触发压力', type: 'number', required: true, unit: 'g', placeholder: '45' },
+      { name: 'lubed', label: '出厂润滑', type: 'bool', required: false },
+      { name: 'mount', label: '安装方式', type: 'select', required: false, options: ['plate', 'pcb'] },
+      { name: 'pack', label: '数量', type: 'number', required: true, unit: '个', placeholder: '70' },
     ],
   },
 };

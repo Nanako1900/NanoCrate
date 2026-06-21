@@ -34,17 +34,17 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     return [
       ...ADMIN_NAV.map((item) => ({
         id: `nav-${item.to}`,
-        label: `Go to ${item.label}`,
+        label: `前往${item.label}`,
         hint: item.to,
         keywords: item.label,
         icon: item.icon,
         run: go(item.to),
       })),
-      { id: 'new-product', label: 'Create product', hint: 'new', keywords: 'add product create', icon: PlusIcon, run: go('/admin/products/new') },
-      { id: 'view-store', label: 'View storefront', keywords: 'shop store front', icon: SearchIcon, run: go('/') },
+      { id: 'new-product', label: '新建商品', hint: 'new', keywords: 'add product create', icon: PlusIcon, run: go('/admin/products/new') },
+      { id: 'view-store', label: '查看店面', keywords: 'shop store front', icon: SearchIcon, run: go('/') },
       {
         id: 'toggle-theme',
-        label: `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`,
+        label: `切换到${theme === 'dark' ? '浅色' : '深色'}主题`,
         keywords: 'theme dark light mode',
         icon: SearchIcon,
         run: () => {
@@ -54,7 +54,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       },
       {
         id: 'sign-out',
-        label: 'Sign out',
+        label: '退出登录',
         keywords: 'logout exit',
         icon: SearchIcon,
         run: () => {
@@ -87,7 +87,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Command palette" bare size="md" panelClassName="overflow-hidden">
+    <Modal open={open} onClose={onClose} title="命令面板" bare size="md" panelClassName="overflow-hidden">
       <div className="flex items-center gap-2 border-b border-line px-4">
         <SearchIcon size={18} className="shrink-0 text-ink-faint" />
         <input
@@ -97,21 +97,21 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           aria-expanded="true"
           aria-controls="command-list"
           aria-activedescendant={filtered[clampedActive] ? `command-${filtered[clampedActive].id}` : undefined}
-          aria-label="Search commands"
+          aria-label="搜索命令"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
           }}
           onKeyDown={onInputKeyDown}
-          placeholder="Type a command or search…"
+          placeholder="输入命令或搜索…"
           className="h-12 w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
         />
         <kbd className="hidden rounded border border-line bg-surface-sunken px-1.5 py-0.5 font-mono text-2xs text-ink-faint sm:inline">esc</kbd>
       </div>
       <ul id="command-list" role="listbox" aria-label="Commands" className="max-h-80 overflow-y-auto p-2">
         {filtered.length === 0 ? (
-          <li className="px-3 py-6 text-center text-sm text-ink-faint">No commands match “{query}”.</li>
+          <li className="px-3 py-6 text-center text-sm text-ink-faint">没有匹配“{query}”的命令。</li>
         ) : (
           filtered.map((cmd, i) => {
             const Icon = cmd.icon;

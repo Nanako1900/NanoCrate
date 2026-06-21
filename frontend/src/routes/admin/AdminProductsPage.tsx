@@ -4,7 +4,6 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { PlusIcon } from '@/components/admin/icons';
 import { DataTable, type Column, type SortState } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
-import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
@@ -12,19 +11,10 @@ import { Select } from '@/components/ui/Select';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/ToastContext';
 import { useAdminProducts, useAdminProductTypes, useArchiveProduct } from '@/hooks/admin/useAdminProducts';
+import { AdminProductStatusBadge } from '@/components/admin/status';
 import { formatPrice } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { AdminProductListItem, ProductStatus } from '@/services/admin-types';
-
-const STATUS_TONE: Record<ProductStatus, BadgeTone> = { active: 'in', draft: 'low', archived: 'neutral' };
-
-function StatusBadge({ status }: { status: ProductStatus }) {
-  return (
-    <Badge tone={STATUS_TONE[status]} mono>
-      {status}
-    </Badge>
-  );
-}
+import type { AdminProductListItem } from '@/services/admin-types';
 
 export function AdminProductsPage() {
   const navigate = useNavigate();
@@ -61,16 +51,16 @@ export function AdminProductsPage() {
     setSelected(new Set());
     setConfirm(null);
     if (failed === 0) {
-      toast({ tone: 'success', title: ids.length > 1 ? `${ids.length} products archived` : 'Product archived' });
+      toast({ tone: 'success', title: ids.length > 1 ? `已归档 ${ids.length} 个商品` : '商品已归档' });
     } else {
-      toast({ tone: 'error', title: 'Some products could not be archived', description: `${failed} failed.` });
+      toast({ tone: 'error', title: '部分商品归档失败', description: `${failed} 个失败。` });
     }
   }
 
   const columns: Column<AdminProductListItem>[] = [
     {
       key: 'name',
-      header: 'Product',
+      header: '商品',
       sortable: true,
       cell: (p) => (
         <div className="flex items-center gap-3">
@@ -82,12 +72,12 @@ export function AdminProductsPage() {
         </div>
       ),
     },
-    { key: 'type', header: 'Type', cell: (p) => <span className="capitalize text-ink-soft">{p.type}</span>, hideBelow: 'md' },
-    { key: 'status', header: 'Status', sortable: true, cell: (p) => <StatusBadge status={p.status} /> },
-    { key: 'variants', header: 'Variants', align: 'right', cell: (p) => <span className="font-mono tabular-nums text-ink-soft">{p.variant_count}</span>, hideBelow: 'lg' },
+    { key: 'type', header: '类型', cell: (p) => <span className="capitalize text-ink-soft">{p.type}</span>, hideBelow: 'md' },
+    { key: 'status', header: '状态', sortable: true, cell: (p) => <AdminProductStatusBadge status={p.status} /> },
+    { key: 'variants', header: '规格数', align: 'right', cell: (p) => <span className="font-mono tabular-nums text-ink-soft">{p.variant_count}</span>, hideBelow: 'lg' },
     {
       key: 'price',
-      header: 'Price',
+      header: '价格',
       sortable: true,
       align: 'right',
       hideBelow: 'sm',
@@ -101,7 +91,7 @@ export function AdminProductsPage() {
     },
     {
       key: 'stock',
-      header: 'Stock',
+      header: '库存',
       sortable: true,
       align: 'right',
       cell: (p) => <span className={cn('font-mono tabular-nums', p.total_available === 0 ? 'text-stock-out-ink' : 'text-ink')}>{p.total_available}</span>,
@@ -111,13 +101,13 @@ export function AdminProductsPage() {
   return (
     <>
       <AdminPageHeader
-        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Products' }]}
-        title="Products"
-        description="Catalog items, variants, and availability."
+        breadcrumbs={[{ label: '后台', to: '/admin' }, { label: '商品' }]}
+        title="商品"
+        description="目录商品、规格与可售量。"
         actions={
           <Link to="/admin/products/new" className={buttonClasses('primary', 'sm')}>
             <PlusIcon size={16} />
-            New product
+            新建商品
           </Link>
         }
       />
@@ -128,40 +118,40 @@ export function AdminProductsPage() {
             type="search"
             value={q}
             onChange={(e) => resetPageThen(() => setQ(e.target.value))}
-            placeholder="Search products…"
-            aria-label="Search products"
+            placeholder="搜索商品…"
+            aria-label="搜索商品"
           />
         </div>
-        <Select value={type} onChange={(e) => resetPageThen(() => setType(e.target.value))} aria-label="Filter by type" className="w-auto">
-          <option value="">All types</option>
+        <Select value={type} onChange={(e) => resetPageThen(() => setType(e.target.value))} aria-label="按类型筛选" className="w-auto">
+          <option value="">全部类型</option>
           {types?.map((t) => (
             <option key={t.key} value={t.key}>
               {t.name}
             </option>
           ))}
         </Select>
-        <Select value={status} onChange={(e) => resetPageThen(() => setStatus(e.target.value))} aria-label="Filter by status" className="w-auto">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="draft">Draft</option>
-          <option value="archived">Archived</option>
+        <Select value={status} onChange={(e) => resetPageThen(() => setStatus(e.target.value))} aria-label="按状态筛选" className="w-auto">
+          <option value="">全部状态</option>
+          <option value="active">上架</option>
+          <option value="draft">草稿</option>
+          <option value="archived">已归档</option>
         </Select>
       </div>
 
       {selected.size > 0 && (
         <div role="status" className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-interactive/30 bg-interactive-soft px-4 py-2 text-sm">
-          <span className="font-medium text-ink">{selected.size} selected</span>
-          <Button variant="danger" size="sm" onClick={() => setConfirm({ ids: [...selected], label: `${selected.size} products` })}>
-            Archive
+          <span className="font-medium text-ink">已选 {selected.size} 项</span>
+          <Button variant="danger" size="sm" onClick={() => setConfirm({ ids: [...selected], label: `${selected.size} 个商品` })}>
+            归档
           </Button>
           <button type="button" onClick={() => setSelected(new Set())} className="text-interactive hover:underline">
-            Clear
+            清除
           </button>
         </div>
       )}
 
       <DataTable
-        caption="Products"
+        caption="商品"
         columns={columns}
         rows={rows}
         rowKey={(p) => p.id}
@@ -171,16 +161,16 @@ export function AdminProductsPage() {
         selected={selected}
         onSelectedChange={setSelected}
         onRowClick={(p) => navigate(`/admin/products/${p.id}`)}
-        rowLabel={(p) => `Edit ${p.name}`}
+        rowLabel={(p) => `编辑 ${p.name}`}
         rowActions={(p) => (
           <>
-            <IconButton label={`Edit ${p.name}`} size="sm" onClick={() => navigate(`/admin/products/${p.id}`)}>
+            <IconButton label={`编辑 ${p.name}`} size="sm" onClick={() => navigate(`/admin/products/${p.id}`)}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
             </IconButton>
             {p.status !== 'archived' && (
-              <IconButton label={`Archive ${p.name}`} size="sm" variant="danger" onClick={() => setConfirm({ ids: [p.id], label: p.name })}>
+              <IconButton label={`归档 ${p.name}`} size="sm" variant="danger" onClick={() => setConfirm({ ids: [p.id], label: p.name })}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" />
                 </svg>
@@ -199,9 +189,9 @@ export function AdminProductsPage() {
         open={Boolean(confirm)}
         onClose={() => setConfirm(null)}
         onConfirm={() => confirm && runArchive(confirm.ids)}
-        title="Archive product?"
-        description={confirm ? `${confirm.label} will be hidden from the storefront. You can restore it later.` : ''}
-        confirmLabel="Archive"
+        title="归档商品?"
+        description={confirm ? `${confirm.label} 将从店面下架,之后可恢复。` : ''}
+        confirmLabel="归档"
         loading={archive.isPending}
       />
     </>

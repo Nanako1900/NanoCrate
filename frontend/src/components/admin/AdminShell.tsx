@@ -22,16 +22,8 @@ export function AdminShell() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  // Scope the indigo admin skin to the whole document while the console is
-  // mounted, so portaled toasts/dialogs/⌘K inherit it too. Removed on leave →
-  // the storefront keeps its warm palette.
-  useEffect(() => {
-    document.documentElement.dataset.skin = 'admin';
-    return () => {
-      delete document.documentElement.dataset.skin;
-    };
-  }, []);
+  // (The indigo skin + zh-CN language are scoped by AdminRoute, the outer /admin
+  //  boundary, so the gate and lazy-shell load are covered too.)
 
   return (
     <ToastProvider>

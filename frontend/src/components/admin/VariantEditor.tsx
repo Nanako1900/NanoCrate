@@ -28,16 +28,16 @@ function SingleVariantModal({ product, editing, onClose }: { product: AdminProdu
 
   async function submit() {
     setError(null);
-    if (!sku.trim()) return setError('SKU is required.');
-    if (!Number.isFinite(Number(price)) || Number(price) < 0) return setError('Enter a valid price.');
+    if (!sku.trim()) return setError('SKU 为必填。');
+    if (!Number.isFinite(Number(price)) || Number(price) < 0) return setError('请输入有效价格。');
     const payload = { sku: sku.trim(), name: name.trim() || sku.trim(), price_cents: dollarsToCents(price), available: Math.max(0, Math.floor(Number(available)) || 0), attributes: editing?.attributes ?? {} };
     try {
       if (editing) await update.mutateAsync({ variantId: editing.id, input: payload });
       else await create.mutateAsync(payload);
-      toast({ tone: 'success', title: editing ? 'Variant updated' : 'Variant added' });
+      toast({ tone: 'success', title: editing ? '规格已更新' : '规格已添加' });
       onClose();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not save the variant.');
+      setError(e instanceof ApiError ? e.message : '保存规格失败。');
     }
   }
 
@@ -45,14 +45,14 @@ function SingleVariantModal({ product, editing, onClose }: { product: AdminProdu
     <Modal
       open
       onClose={pending ? () => {} : onClose}
-      title={editing ? 'Edit variant' : 'Add variant'}
+      title={editing ? '编辑规格' : '添加规格'}
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={onClose} disabled={pending}>
-            Cancel
+            取消
           </Button>
           <Button size="sm" onClick={submit} loading={pending}>
-            {editing ? 'Save' : 'Add variant'}
+            {editing ? '保存' : '添加规格'}
           </Button>
         </>
       }
@@ -66,14 +66,14 @@ function SingleVariantModal({ product, editing, onClose }: { product: AdminProdu
         <FormField label="SKU" required>
           <Input value={sku} onChange={(e) => setSku(e.target.value)} className="font-mono uppercase" placeholder="NANO75-RED-PBTW" />
         </FormField>
-        <FormField label="Variant name">
+        <FormField label="规格名称">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="75% / Red linear / White PBT" />
         </FormField>
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="Price (USD)" required>
+          <FormField label="价格(美元)" required>
             <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="font-mono tabular-nums" placeholder="129.00" />
           </FormField>
-          <FormField label="Available">
+          <FormField label="可售">
             <Input type="number" inputMode="numeric" value={available} onChange={(e) => setAvailable(e.target.value)} className="font-mono tabular-nums" />
           </FormField>
         </div>
@@ -137,34 +137,34 @@ function MatrixModal({ product, onClose }: { product: AdminProductDetail; onClos
     setPending(false);
     const failed = results.filter((r) => r.status === 'rejected').length;
     if (failed === 0) {
-      toast({ tone: 'success', title: `${rows.length} variants created` });
+      toast({ tone: 'success', title: `已创建 ${rows.length} 个规格` });
       onClose();
     } else {
-      toast({ tone: 'error', title: 'Some variants were rejected', description: `${failed} failed (likely duplicate SKUs).` });
+      toast({ tone: 'error', title: '部分规格被拒绝', description: `${failed} 个失败(可能 SKU 重复)。` });
     }
   }
 
   return (
-    <Modal open onClose={pending ? () => {} : onClose} title="Generate variants from options" size="lg" description="Define option dimensions; every combination becomes a variant.">
+    <Modal open onClose={pending ? () => {} : onClose} title="按选项生成规格" size="lg" description="定义选项维度,每个组合生成一个规格。">
       <div className="grid gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
           {groups.map((g, i) => (
             <div key={i} className="grid gap-2 rounded-md border border-line p-3">
-              <FormField label={`Option ${i + 1} name`}>
+              <FormField label={`选项 ${i + 1} 名称`}>
                 <Input value={g.name} onChange={(e) => setGroups((gs) => gs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="switch" />
               </FormField>
-              <FormField label="Values" help="Comma or newline separated.">
+              <FormField label="取值" help="用逗号或换行分隔。">
                 <Input value={g.raw} onChange={(e) => setGroups((gs) => gs.map((x, j) => (j === i ? { ...x, raw: e.target.value } : x)))} placeholder="red, brown, silent" />
               </FormField>
             </div>
           ))}
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <FormField label="Base price (USD)" className="w-40">
+          <FormField label="基准价格(美元)" className="w-40">
             <Input type="number" inputMode="decimal" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className="font-mono tabular-nums" placeholder="129.00" />
           </FormField>
           <Button variant="secondary" size="sm" onClick={generate} disabled={combos.length === 0}>
-            Preview {combos.length > 0 ? `${combos.length} combos` : ''}
+            预览 {combos.length > 0 ? `${combos.length} 个组合` : ''}
           </Button>
         </div>
 
@@ -174,23 +174,23 @@ function MatrixModal({ product, onClose }: { product: AdminProductDetail; onClos
               <thead>
                 <tr className="border-b border-line bg-surface-sunken">
                   <th scope="col" className="label-mono px-3 py-2 text-left">SKU</th>
-                  <th scope="col" className="label-mono px-3 py-2 text-left">Combination</th>
-                  <th scope="col" className="label-mono px-3 py-2 text-right">Price</th>
-                  <th scope="col" className="label-mono px-3 py-2 text-right">Stock</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-left">组合</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-right">价格</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-right">库存</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i} className="border-b border-line/60 last:border-0">
                     <td className="px-3 py-2">
-                      <Input value={r.sku} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, sku: e.target.value } : x)))} aria-label={`SKU for ${r.label}`} className="h-9 font-mono uppercase" />
+                      <Input value={r.sku} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, sku: e.target.value } : x)))} aria-label={`${r.label} 的 SKU`} className="h-9 font-mono uppercase" />
                     </td>
                     <td className="px-3 py-2 text-ink-soft">{r.label}</td>
                     <td className="px-3 py-2">
-                      <Input type="number" value={r.price} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} aria-label={`Price for ${r.label}`} className="h-9 w-24 font-mono tabular-nums" />
+                      <Input type="number" value={r.price} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} aria-label={`${r.label} 的价格`} className="h-9 w-24 font-mono tabular-nums" />
                     </td>
                     <td className="px-3 py-2">
-                      <Input type="number" value={r.available} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, available: e.target.value } : x)))} aria-label={`Stock for ${r.label}`} className="h-9 w-20 font-mono tabular-nums" />
+                      <Input type="number" value={r.available} onChange={(e) => setRows((rs) => rs!.map((x, j) => (j === i ? { ...x, available: e.target.value } : x)))} aria-label={`${r.label} 的库存`} className="h-9 w-20 font-mono tabular-nums" />
                     </td>
                   </tr>
                 ))}
@@ -201,10 +201,10 @@ function MatrixModal({ product, onClose }: { product: AdminProductDetail; onClos
 
         <div className="flex justify-end gap-2 border-t border-line pt-4">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={pending}>
-            Cancel
+            取消
           </Button>
           <Button size="sm" onClick={createAll} loading={pending} disabled={!rows || rows.length === 0}>
-            Create {rows?.length ?? 0} variants
+            创建 {rows?.length ?? 0} 个规格
           </Button>
         </div>
       </div>
@@ -221,34 +221,34 @@ export function VariantEditor({ product }: { product: AdminProductDetail }) {
     <section className="rounded-lg border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Variants &amp; SKUs</h2>
-          <p className="label-mono normal-case text-ink-faint">{variants.length} variants</p>
+          <h2 className="text-sm font-semibold text-ink">规格与 SKU</h2>
+          <p className="label-mono normal-case text-ink-faint">{variants.length} 个规格</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setMatrix(true)}>
-            Generate from options
+            按选项生成
           </Button>
           <Button size="sm" onClick={() => setSingle({ editing: null })}>
             <PlusIcon size={16} />
-            Add variant
+            添加规格
           </Button>
         </div>
       </div>
 
       {variants.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-ink-soft">No variants yet. Add one, or generate a set from an option matrix.</p>
+        <p className="px-5 py-8 text-center text-sm text-ink-soft">暂无规格。手动添加,或用选项矩阵批量生成。</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[34rem] text-sm">
-            <caption className="sr-only">Variants for {product.name}</caption>
+            <caption className="sr-only">{product.name} 的规格</caption>
             <thead>
               <tr className="border-b border-line bg-surface-sunken">
                 <th scope="col" className="label-mono px-5 py-2 text-left">SKU</th>
-                <th scope="col" className="label-mono px-3 py-2 text-left">Name</th>
-                <th scope="col" className="label-mono px-3 py-2 text-right">Price</th>
-                <th scope="col" className="label-mono px-3 py-2 text-right">Avail</th>
-                <th scope="col" className="label-mono px-3 py-2 text-right">Resv</th>
-                <th scope="col" className="px-3 py-2"><span className="sr-only">Actions</span></th>
+                <th scope="col" className="label-mono px-3 py-2 text-left">名称</th>
+                <th scope="col" className="label-mono px-3 py-2 text-right">价格</th>
+                <th scope="col" className="label-mono px-3 py-2 text-right">可售</th>
+                <th scope="col" className="label-mono px-3 py-2 text-right">预留</th>
+                <th scope="col" className="px-3 py-2"><span className="sr-only">操作</span></th>
               </tr>
             </thead>
             <tbody>
@@ -260,7 +260,7 @@ export function VariantEditor({ product }: { product: AdminProductDetail }) {
                   <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink">{v.available}</td>
                   <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-faint">{v.reserved ?? 0}</td>
                   <td className="px-3 py-2.5 text-right">
-                    <IconButton label={`Edit ${v.sku}`} size="sm" onClick={() => setSingle({ editing: v })}>
+                    <IconButton label={`编辑 ${v.sku}`} size="sm" onClick={() => setSingle({ editing: v })}>
                       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                       </svg>

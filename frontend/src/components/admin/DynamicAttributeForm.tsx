@@ -39,7 +39,7 @@ function FieldControl({
     case 'select':
       return (
         <Select value={String(value)} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
-          <option value="">Select…</option>
+          <option value="">请选择…</option>
           {field.options?.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
@@ -83,7 +83,7 @@ function FieldControl({
  *  per-field errors, help text — all derived from the schema, nothing hardcoded. */
 export function DynamicAttributeForm({ schema, values, errors, onChange, disabled }: DynamicAttributeFormProps) {
   if (schema.fields.length === 0) {
-    return <p className="text-sm text-ink-faint">This product type has no attributes.</p>;
+    return <p className="text-sm text-ink-faint">该商品类型没有属性。</p>;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
