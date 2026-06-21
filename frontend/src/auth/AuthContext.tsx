@@ -10,55 +10,75 @@ import {
 import type KeycloakInstance from 'keycloak-js';
 import { isMockMode, keycloakConfig } from '@/lib/env';
 import { clearAuthToken, setAuthToken } from '@/services/auth-token';
+import { MOCK_ADMIN, MOCK_CUSTOMER, type MockSession } from './mock-session';
 
 /**
  * Auth is mode-aware. Live: keycloak-js with OIDC + PKCE, access token kept in
- * memory only (never localStorage). Mock: an in-memory dev session so protected
- * routes (cart → checkout → orders) are exercisable with zero backend.
+ * memory only (never localStorage). Mock: in-memory demo sessions so both the
+ * storefront (customer) and the admin RBAC path (admin role) are exercisable
+ * with zero backend.
  */
 export interface AuthUser {
   name: string;
   email: string;
+  roles: string[];
 }
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+
+export interface LoginOptions {
+  /** Mock mode: sign in as the admin demo session (live ignores this — roles
+   *  come from the verified Keycloak token). */
+  admin?: boolean;
+}
 
 interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: () => void;
+  roles: string[];
+  isAdmin: boolean;
+  hasRole: (role: string) => boolean;
+  login: (options?: LoginOptions) => void;
   logout: () => void;
   mode: 'mock' | 'live';
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const MOCK_USER: AuthUser = { name: 'Demo Customer', email: 'demo@nanocrate.dev' };
-const MOCK_TOKEN = 'mock-dev-token';
-
 function MockAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<MockSession | null>(null);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      status: user ? 'authenticated' : 'unauthenticated',
-      user,
-      isAuthenticated: Boolean(user),
-      login: () => {
-        setAuthToken(MOCK_TOKEN);
-        setUser(MOCK_USER);
+  const value = useMemo<AuthContextValue>(() => {
+    const roles = session?.roles ?? [];
+    return {
+      status: session ? 'authenticated' : 'unauthenticated',
+      user: session ? { name: session.name, email: session.email, roles } : null,
+      isAuthenticated: Boolean(session),
+      roles,
+      isAdmin: roles.includes('admin'),
+      hasRole: (role) => roles.includes(role),
+      login: (options) => {
+        const next = options?.admin ? MOCK_ADMIN : MOCK_CUSTOMER;
+        setAuthToken(next.token);
+        setSession(next);
       },
       logout: () => {
         clearAuthToken();
-        setUser(null);
+        setSession(null);
       },
       mode: 'mock',
-    }),
-    [user],
-  );
+    };
+  }, [session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+interface KeycloakClaims {
+  name?: string;
+  preferred_username?: string;
+  email?: string;
+  realm_access?: { roles?: string[] };
 }
 
 function LiveAuthProvider({ children }: { children: ReactNode }) {
@@ -88,12 +108,11 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
 
         if (authenticated && keycloak.token) {
           setAuthToken(keycloak.token);
-          const claims = keycloak.tokenParsed as
-            | { name?: string; preferred_username?: string; email?: string }
-            | undefined;
+          const claims = keycloak.tokenParsed as KeycloakClaims | undefined;
           setUser({
             name: claims?.name ?? claims?.preferred_username ?? 'Account',
             email: claims?.email ?? '',
+            roles: claims?.realm_access?.roles ?? [],
           });
           setStatus('authenticated');
         } else {
@@ -107,7 +126,6 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
               if (refreshed && keycloak.token) setAuthToken(keycloak.token);
             })
             .catch(() => {
-              // Refresh failed → drop the session and guide the user to re-login.
               clearAuthToken();
               setUser(null);
               setStatus('unauthenticated');
@@ -123,20 +141,23 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const value = useMemo<AuthContextValue>(() => {
+    const roles = user?.roles ?? [];
+    return {
       status,
       user,
       isAuthenticated: status === 'authenticated',
+      roles,
+      isAdmin: roles.includes('admin'),
+      hasRole: (role) => roles.includes(role),
       login: () => void keycloakRef.current?.login({ redirectUri: window.location.href }),
       logout: () => {
         clearAuthToken();
         void keycloakRef.current?.logout({ redirectUri: window.location.origin });
       },
       mode: 'live',
-    }),
-    [status, user],
-  );
+    };
+  }, [status, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

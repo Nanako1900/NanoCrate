@@ -35,7 +35,7 @@ export function ProtectedRoute({
         <p className="label-mono text-2xs uppercase tracking-[0.08em] text-ink-faint">Account required</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
         <p className="text-ink-soft">{description}</p>
-        <Button onClick={login} className="mt-2 w-full sm:w-auto sm:min-w-48">
+        <Button onClick={() => login()} className="mt-2 w-full sm:w-auto sm:min-w-48">
           Sign in
         </Button>
         {mode === 'mock' && (

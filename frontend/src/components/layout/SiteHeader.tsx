@@ -111,7 +111,7 @@ function AccountMenu() {
     return (
       <button
         type="button"
-        onClick={login}
+        onClick={() => login()}
         className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-sm text-ink transition-[transform,background-color,border-color,color] duration-150 ease-out hover:border-line-strong active:translate-y-px sm:px-3"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
