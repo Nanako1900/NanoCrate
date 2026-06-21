@@ -10,6 +10,7 @@ const PAGES: ReadonlyArray<{ path: string; ready: (page: Page) => Promise<unknow
   { path: '/', ready: (page) => page.getByRole('link', { name: /nano75/i }).first().waitFor() },
   { path: '/p/nano75', ready: (page) => page.getByRole('button', { name: 'Add to cart' }).waitFor() },
   { path: '/cart', ready: (page) => page.getByRole('heading', { name: /cart/i }).first().waitFor() },
+  { path: '/search?q=wireless%2065%25', ready: (page) => page.locator('ol li a[href^="/p/"]').first().waitFor() },
 ];
 
 for (const width of WIDTHS) {

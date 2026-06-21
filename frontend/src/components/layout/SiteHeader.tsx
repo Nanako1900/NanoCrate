@@ -173,7 +173,8 @@ export function SiteHeader() {
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const q = term.trim();
-    navigate(q ? `/?q=${encodeURIComponent(q)}` : '/');
+    // Enter runs a semantic search (§9.3 /search); empty submits return to browse.
+    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/');
   }
 
   return (

@@ -11,6 +11,7 @@ import { AppShell } from './components/layout/AppShell';
 import { CatalogPage } from './routes/CatalogPage';
 import { ProductPage } from './routes/ProductPage';
 import { CartPage } from './routes/CartPage';
+import { SearchPage } from './routes/SearchPage';
 import { CheckoutPage } from './routes/CheckoutPage';
 import { CheckoutResultPage } from './routes/CheckoutResultPage';
 import { OrdersPage } from './routes/OrdersPage';
@@ -61,6 +62,7 @@ export function App() {
                 <Route path="/" element={<CatalogPage />} />
                 <Route path="/c/:type" element={<CategoryRedirect />} />
                 <Route path="/p/:slug" element={<ProductPage />} />
+                <Route path="/search" element={<SearchPage />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route
                   path="/checkout"

@@ -131,21 +131,43 @@ export const handlers = [
       return fail('validation_failed', 'A non-empty "query" is required.', 422);
     }
 
-    // Stub ranking: keyword overlap, with a deterministic fallback ordering so
-    // even a fuzzy natural-language query returns a stable, demoable result set.
-    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+    // Mock of a semantic+keyword hybrid: natural-language terms are expanded to
+    // attribute synonyms, then scored by how many query terms a product matches
+    // (across product + variant text). A query that matches nothing returns no
+    // hits, so the no-results UX is reachable. Deterministic, demoable.
+    const SYNONYMS: Record<string, string[]> = {
+      quiet: ['silent'], silent: ['silent'], gaming: ['linear', 'red'], fast: ['linear'],
+      typing: ['tactile', 'brown'], office: ['full', 'tactile'], wireless: ['wireless'], wired: ['wired'],
+      compact: ['60%', '65%'], small: ['60%', '65%'], mini: ['60%'], 'full-size': ['full'], fullsize: ['full'],
+      tenkeyless: ['tkl'], 'hot-swappable': ['hot_swappable'], hotswap: ['hot_swappable'], hotswappable: ['hot_swappable'],
+      metal: ['aluminum'], rgb: ['backlight'], numpad: ['numpad', '1800'], split: ['split'], ergonomic: ['split'],
+    };
+    const tokens = query.toLowerCase().split(/[\s,]+/).filter(Boolean);
+
     const ranked = mockProducts
       .map((product, index) => {
-        const haystack = [product.name, product.description, ...Object.values(product.attributes).map(String)]
+        const haystack = [
+          product.name,
+          product.description,
+          product.type,
+          ...Object.entries(product.attributes).map(([k, v]) => `${k} ${v}`),
+          ...product.variants.flatMap((v) => [v.name, v.sku, ...Object.values(v.attributes).map(String)]),
+        ]
           .join(' ')
           .toLowerCase();
-        const overlap = tokens.reduce((acc, token) => (haystack.includes(token) ? acc + 1 : acc), 0);
-        const keywordScore = tokens.length ? overlap / tokens.length : 0;
-        const score = Number((keywordScore * 0.7 + (1 - index / mockProducts.length) * 0.3).toFixed(2));
-        return { slug: product.slug, name: product.name, score };
+        const matched = tokens.filter((token) => {
+          const terms = [token, ...(SYNONYMS[token] ?? [])];
+          return terms.some((t) => haystack.includes(t));
+        }).length;
+        const keywordScore = tokens.length ? matched / tokens.length : 0;
+        // Blend match quality with a small position prior (catalog freshness).
+        const score = Number((keywordScore * 0.85 + (1 - index / mockProducts.length) * 0.15).toFixed(2));
+        return { slug: product.slug, name: product.name, score, matched };
       })
+      .filter((hit) => hit.matched > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+      .slice(0, limit)
+      .map(({ slug, name, score }) => ({ slug, name, score }));
 
     return ok({ hits: ranked });
   }),
