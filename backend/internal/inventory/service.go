@@ -106,6 +106,38 @@ func (s *Service) GetInventory(ctx context.Context, variantID uuid.UUID) (invdb.
 	return invdb.New(s.pool).GetInventory(ctx, variantID)
 }
 
+// Restock adds qty to a variant's available stock (admin), creating the inventory
+// row if absent, and journals a 'restock' ledger entry — all in one transaction.
+func (s *Service) Restock(ctx context.Context, variantID uuid.UUID, qty int32) (invdb.Inventory, error) {
+	if qty <= 0 {
+		return invdb.Inventory{}, ErrInvalidRestock
+	}
+	var inv invdb.Inventory
+	err := s.inTx(ctx, func(q *invdb.Queries) error {
+		if _, e := q.RestockStock(ctx, invdb.RestockStockParams{VariantID: variantID, Available: qty}); e != nil {
+			return fmt.Errorf("restock stock: %w", e)
+		}
+		if e := q.InsertLedger(ctx, invdb.InsertLedgerParams{
+			VariantID:      variantID,
+			DeltaAvailable: qty,
+			DeltaReserved:  0,
+			Kind:           kindRestock,
+			ReservationID:  pgUUIDPtr(nil),
+		}); e != nil {
+			return fmt.Errorf("ledger restock: %w", e)
+		}
+		var ge error
+		inv, ge = q.GetInventory(ctx, variantID)
+		return ge
+	})
+	return inv, err
+}
+
+// EnsureInventoryRow creates a zeroed inventory row for a new variant if absent.
+func (s *Service) EnsureInventoryRow(ctx context.Context, variantID uuid.UUID) error {
+	return invdb.New(s.pool).EnsureInventoryRow(ctx, variantID)
+}
+
 // inTx runs fn inside a transaction (default READ COMMITTED, which is correct for
 // the atomic conditional reserve).
 func (s *Service) inTx(ctx context.Context, fn func(*invdb.Queries) error) error {

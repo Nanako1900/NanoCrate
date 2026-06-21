@@ -83,6 +83,17 @@ func (q *Queries) CreateReservation(ctx context.Context, arg CreateReservationPa
 	return i, err
 }
 
+const ensureInventoryRow = `-- name: EnsureInventoryRow :exec
+INSERT INTO inventory (variant_id, available, reserved) VALUES ($1, 0, 0)
+ON CONFLICT (variant_id) DO NOTHING
+`
+
+// 新建规格时建空库存行(available 0)。
+func (q *Queries) EnsureInventoryRow(ctx context.Context, variantID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, ensureInventoryRow, variantID)
+	return err
+}
+
 const getInventory = `-- name: GetInventory :one
 SELECT variant_id, available, reserved, updated_at
 FROM inventory WHERE variant_id = $1
@@ -274,6 +285,26 @@ type ReleaseReservedStockParams struct {
 // 释放(取消/超时):available++, reserved--。
 func (q *Queries) ReleaseReservedStock(ctx context.Context, arg ReleaseReservedStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, releaseReservedStock, arg.VariantID, arg.Available)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restockStock = `-- name: RestockStock :execrows
+INSERT INTO inventory (variant_id, available, reserved) VALUES ($1, $2, 0)
+ON CONFLICT (variant_id) DO UPDATE
+    SET available = inventory.available + EXCLUDED.available, updated_at = now()
+`
+
+type RestockStockParams struct {
+	VariantID uuid.UUID `json:"variant_id"`
+	Available int32     `json:"available"`
+}
+
+// 补货(admin):available += qty。库存行不存在则建之(新规格首次补货)。
+func (q *Queries) RestockStock(ctx context.Context, arg RestockStockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restockStock, arg.VariantID, arg.Available)
 	if err != nil {
 		return 0, err
 	}

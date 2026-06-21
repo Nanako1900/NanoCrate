@@ -15,6 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/Nanako1900/NanoCrate/backend/internal/admin"
 	"github.com/Nanako1900/NanoCrate/backend/internal/auth"
 	"github.com/Nanako1900/NanoCrate/backend/internal/cart"
 	"github.com/Nanako1900/NanoCrate/backend/internal/catalog"
@@ -75,6 +76,7 @@ func main() {
 	cartHandler := cart.NewHandler(cart.NewService(pool), cfg.AppEnv != "development")
 	orderHandler := order.NewHandler(order.NewService(pool))
 	checkoutHandler := checkout.NewHandler(checkout.NewService(pool, inventoryService, selectPaymentProvider(cfg, logger), metricsRegistry))
+	adminHandler := admin.NewHandler(admin.NewService(pool, inventoryService))
 
 	router := newRouter(apiDeps{
 		cfg:      cfg,
@@ -86,6 +88,7 @@ func main() {
 		cart:     cartHandler,
 		order:    orderHandler,
 		checkout: checkoutHandler,
+		admin:    adminHandler,
 	})
 
 	srv := &http.Server{
