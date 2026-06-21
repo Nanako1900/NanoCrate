@@ -1,0 +1,82 @@
+/*
+ * Admin re-skin — "industrial Stripe" (cool neutral + indigo), per the approved
+ * design (NanoCrate Admin.dc.html). COLOR TOKENS ONLY, scoped to the admin
+ * subtree via [data-surface="admin"] so the storefront keeps its warm-amber
+ * palette untouched. Sizing / radius / spacing / motion tokens are inherited
+ * from :root unchanged — this is a skin, not a redesign.
+ *
+ * `data-theme` (light/dark) lives on <html> (see lib/theme.ts), while
+ * data-surface="admin" lives on the AdminShell root, so the dark override uses a
+ * descendant selector. `--accent-on` is text on a SOLID accent fill (buttons),
+ * `--accent-ink` is text on an accent-SOFT tint (badges/active nav).
+ */
+
+[data-surface='admin'] {
+  --paper: oklch(97.5% 0.004 255);
+  --surface: oklch(99.2% 0.002 255);
+  --surface-sunken: oklch(94.5% 0.005 255);
+  --surface-invert: oklch(24% 0.02 260);
+  --ink: oklch(26% 0.02 260);
+  --ink-soft: oklch(46% 0.018 260);
+  --ink-faint: oklch(58% 0.014 258);
+  --ink-invert: oklch(97% 0.004 255);
+  --line: oklch(90% 0.006 258);
+  --line-strong: oklch(82% 0.008 258);
+  --grid: oklch(84% 0.008 258 / 0.55);
+  --accent: oklch(55% 0.21 277);
+  --accent-strong: oklch(49% 0.21 278);
+  --accent-soft: oklch(95% 0.035 278);
+  --accent-ink: oklch(46% 0.19 278);
+  --accent-on: oklch(99% 0.008 278);
+  --interactive: oklch(52% 0.13 250);
+  --interactive-strong: oklch(45% 0.14 250);
+  --interactive-soft: oklch(94% 0.03 250);
+  --stock-in: oklch(58% 0.12 150);
+  --stock-in-bg: oklch(92% 0.05 150);
+  --stock-in-ink: oklch(40% 0.09 152);
+  --stock-low: oklch(70% 0.13 72);
+  --stock-low-bg: oklch(93% 0.06 75);
+  --stock-low-ink: oklch(44% 0.1 60);
+  --stock-out: oklch(58% 0.16 28);
+  --stock-out-bg: oklch(93% 0.045 28);
+  --stock-out-ink: oklch(46% 0.13 28);
+  --shadow-sm: 0 1px 1px oklch(35% 0.05 277 / 0.07), 0 2px 4px oklch(35% 0.05 277 / 0.06);
+  --shadow-md: 0 2px 5px oklch(35% 0.06 277 / 0.1), 0 1px 2px oklch(35% 0.05 277 / 0.1);
+  --shadow-lift: 0 14px 30px oklch(35% 0.07 277 / 0.16), 0 6px 12px oklch(35% 0.06 277 / 0.12);
+  --shadow-inset: inset 0 1px 2px oklch(40% 0.02 260 / 0.11);
+}
+
+[data-theme='dark'] [data-surface='admin'] {
+  --paper: oklch(21% 0.015 260);
+  --surface: oklch(25% 0.016 260);
+  --surface-sunken: oklch(17.5% 0.014 260);
+  --surface-invert: oklch(96% 0.004 255);
+  --ink: oklch(93% 0.008 255);
+  --ink-soft: oklch(76% 0.012 258);
+  --ink-faint: oklch(64% 0.012 258);
+  --ink-invert: oklch(22% 0.016 260);
+  --line: oklch(34% 0.016 260);
+  --line-strong: oklch(44% 0.018 260);
+  --grid: oklch(42% 0.016 260 / 0.45);
+  --accent: oklch(72% 0.16 278);
+  --accent-strong: oklch(78% 0.15 278);
+  --accent-soft: oklch(34% 0.11 278);
+  --accent-ink: oklch(86% 0.1 278);
+  --accent-on: oklch(16% 0.04 278);
+  --interactive: oklch(72% 0.12 250);
+  --interactive-strong: oklch(80% 0.11 250);
+  --interactive-soft: oklch(31% 0.05 250);
+  --stock-in: oklch(68% 0.13 150);
+  --stock-in-bg: oklch(30% 0.05 152);
+  --stock-in-ink: oklch(82% 0.1 150);
+  --stock-low: oklch(78% 0.13 75);
+  --stock-low-bg: oklch(32% 0.05 70);
+  --stock-low-ink: oklch(85% 0.1 75);
+  --stock-out: oklch(68% 0.15 28);
+  --stock-out-bg: oklch(31% 0.06 28);
+  --stock-out-ink: oklch(82% 0.12 28);
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 3px 12px oklch(0% 0 0 / 0.38);
+  --shadow-lift: 0 12px 34px oklch(0% 0 0 / 0.46);
+  --shadow-inset: inset 0 1px 2px oklch(0% 0 0 / 0.34);
+}

@@ -6,6 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // Visual-regression tests are tagged @visual and OS/renderer-specific; the
+  // portable suite runs `pnpm test:e2e` (grep-invert @visual), baselines run via
+  // `pnpm test:visual` (grep @visual).
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

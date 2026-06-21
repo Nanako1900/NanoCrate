@@ -7,9 +7,27 @@
       name="description"
       content="NanoCrate — a spec-sheet storefront for mechanical keyboards. Open-source, fork-friendly commerce."
     />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f3efe7" />
     <title>NanoCrate — Mechanical Keyboards</title>
+    <!-- Pre-paint theme resolution — avoids a flash of the wrong theme.
+         Mirrors lib/theme.ts; only the UI preference is read, never auth. -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('nanocrate-theme');
+          var sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var theme = pref === 'light' || pref === 'dark' ? pref : sys;
+          document.documentElement.dataset.theme = theme;
+          document.querySelector('meta[name="color-scheme"]').setAttribute('content', theme);
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute('content', theme === 'dark' ? '#262320' : '#f3efe7');
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

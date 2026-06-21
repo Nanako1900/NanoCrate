@@ -13,6 +13,7 @@ import {
   updateCartItem,
   variantExists,
 } from './store';
+import { adminHandlers } from './admin/handlers';
 
 /**
  * MSW handlers mirroring backend.md §9 (the contract). Keep these in lockstep
@@ -234,4 +235,7 @@ export const handlers = [
     if (!order) return fail('not_found', `No order found for "${String(params.id)}".`, 404);
     return ok(order);
   }),
+
+  // Admin surface (proposed §9.5) — RBAC-gated inside each handler.
+  ...adminHandlers,
 ];

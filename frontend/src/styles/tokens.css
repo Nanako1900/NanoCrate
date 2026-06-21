@@ -32,7 +32,8 @@
   --accent: oklch(72% 0.155 62);
   --accent-strong: oklch(64% 0.165 56); /* hover / pressed */
   --accent-soft: oklch(93% 0.05 75); /* tinted backgrounds */
-  --accent-ink: oklch(24% 0.04 60); /* text on accent fills */
+  --accent-ink: oklch(24% 0.04 60); /* text on accent-soft tints (badges) */
+  --accent-on: oklch(24% 0.04 60); /* text on SOLID accent fills (buttons); = ink in warm, overridden to light indigo in admin */
 
   /* ---- Color · interactive (steel blue — links, focus, selection) ---- */
   --interactive: oklch(52% 0.12 248);
@@ -102,4 +103,71 @@
   /* ---- Layering ---- */
   --z-header: 50;
   --z-overlay: 100;
+
+  /* ---- Density (storefront default; admin opts into compact) ---- */
+  --space-row: 0.875rem; /* vertical rhythm inside dense rows/tables */
+
+  /* ---- Theme-tuned atmosphere (overridden in dark) ---- */
+  --blueprint-line: var(--line);
+  --blueprint-opacity: 1;
+}
+
+/*
+ * Dark theme — warm charcoal (never pure black) so the amber/steel character
+ * survives. Every role from :root is mirrored; both themes are designed to AA
+ * (ink-faint kept >=4.5:1 on its surfaces, stock ink brightened over darkened
+ * tinted backgrounds). Applied as [data-theme="dark"] on <html>; the resolver
+ * (lib/theme.ts) maps the "system" preference to an explicit value pre-paint.
+ */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* ---- Surfaces (warm charcoal, layered) ---- */
+  --paper: oklch(20% 0.012 62); /* page background — warm charcoal, not black */
+  --surface: oklch(24% 0.014 62); /* raised cards / panels */
+  --surface-sunken: oklch(16.5% 0.012 62); /* recessed wells, tracks, table head */
+  --surface-invert: oklch(95% 0.008 85); /* light blocks for inverted accents */
+
+  /* ---- Ink ---- */
+  --ink: oklch(93% 0.01 85); /* primary text */
+  --ink-soft: oklch(77% 0.014 80); /* secondary text */
+  --ink-faint: oklch(67% 0.014 76); /* labels / meta — AA (>=4.5:1 on surfaces) */
+  --ink-invert: oklch(23% 0.018 62); /* text on light/inverted surfaces */
+
+  /* ---- Structure ---- */
+  --line: oklch(33% 0.014 70);
+  --line-strong: oklch(43% 0.016 72);
+
+  /* ---- Accent (amber, lifted for dark) ---- */
+  --accent: oklch(78% 0.15 66);
+  --accent-strong: oklch(83% 0.155 66); /* hover / pressed — brighter on dark */
+  --accent-soft: oklch(32% 0.06 66); /* tinted fills */
+  --accent-ink: oklch(16% 0.03 60); /* text on accent-soft tints (badges) */
+  --accent-on: oklch(16% 0.03 60); /* text on SOLID accent fills; = ink in warm, overridden in admin */
+
+  /* ---- Interactive (steel blue, lifted) ---- */
+  --interactive: oklch(72% 0.12 246);
+  --interactive-strong: oklch(80% 0.11 246);
+  --interactive-soft: oklch(30% 0.05 246);
+
+  /* ---- Semantic stock states (bg darkened, ink brightened, AA kept) ---- */
+  --stock-in: oklch(72% 0.13 150);
+  --stock-in-bg: oklch(30% 0.05 150);
+  --stock-in-ink: oklch(84% 0.12 150);
+  --stock-low: oklch(78% 0.14 72);
+  --stock-low-bg: oklch(32% 0.055 70);
+  --stock-low-ink: oklch(86% 0.12 75);
+  --stock-out: oklch(70% 0.17 25);
+  --stock-out-bg: oklch(32% 0.075 25);
+  --stock-out-ink: oklch(83% 0.13 25);
+
+  /* ---- Elevation — deeper, near-black shadow; barely-there inset highlight ---- */
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4), 0 1px 1px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 2px 6px oklch(0% 0 0 / 0.4), 0 8px 18px oklch(0% 0 0 / 0.42);
+  --shadow-lift: 0 4px 10px oklch(0% 0 0 / 0.45), 0 18px 38px oklch(0% 0 0 / 0.55);
+  --shadow-inset: inset 0 1px 0 oklch(100% 0 0 / 0.06);
+
+  /* ---- Atmosphere — blueprint grid is subtler on dark ---- */
+  --blueprint-line: var(--line);
+  --blueprint-opacity: 0.6;
 }
